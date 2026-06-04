@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Prisma
+**/prisma/dev.db
+**/prisma/dev.db-journal
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+
+# Testing/Coverage
+coverage/
+.nyc_output
+
+# Generated files
+generated/
+.eslintcache
+
+# Docker
+*.pid
+*.seed
+*.pid.lock
+
+# Project specific
+target.txt
+docs/target.txt
