@@ -1,0 +1,10 @@
+{
+  "name": "frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix url-shortener-frontend run dev",
+    "build": "npm --prefix url-shortener-frontend run build",
+    "start": "npm --prefix url-shortener-frontend run start"
+  }
+}
