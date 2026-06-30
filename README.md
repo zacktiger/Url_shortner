@@ -148,7 +148,7 @@ docker compose up --build
 | Service | Platform |
 |---|---|
 | Frontend | Vercel |
-| Backend + DB | Railway |
-| Redis | Railway |
+| Backend + DB | render |
+| Redis | render |
 
 Remember to update `GOOGLE_CALLBACK_URL` in Google Cloud Console to your production backend URL.
