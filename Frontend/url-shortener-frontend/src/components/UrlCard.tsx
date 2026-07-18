@@ -57,62 +57,55 @@ export default function UrlCard({ url, onDelete }: UrlCardProps) {
         }
     };
 
+    // Small icon-only action button used for QR / stats / delete
+    const iconBtn = "flex items-center justify-center w-9 h-9 rounded-lg border border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:text-white hover:bg-white/[0.07] transition-colors";
+
     return (
-        <div className="glass-card rounded-2xl p-6 relative overflow-hidden group/card border border-white/[0.05]">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
-                <div className="flex-1 min-w-0 space-y-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-md">
-                        /{url.shortCode}
-                    </span>
+        <div className="card card-hover p-5">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="flex-1 min-w-0 space-y-1.5">
                     <div className="flex items-center gap-3 flex-wrap">
                         <a
                             href={shortUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-lg font-bold text-white hover:text-indigo-400 transition-colors flex items-center gap-1.5 break-all group/link"
+                            className="font-mono text-sm sm:text-base font-medium text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1.5 break-all"
                         >
                             {shortUrl}
-                            <ExternalLink className="w-4 h-4 flex-shrink-0 text-slate-500 group-hover/link:text-indigo-400 transition-colors" />
+                            <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
                         </a>
                         {typeof url.clicks === 'number' && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-500/10 text-emerald-400">
                                 {url.clicks} {url.clicks === 1 ? 'click' : 'clicks'}
                             </span>
                         )}
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-slate-450">
-                        <span className="font-semibold text-slate-500 flex-shrink-0">Destination:</span>
-                        <span className="truncate block max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl font-medium" title={url.longUrl}>
-                            {url.longUrl}
-                        </span>
-                    </div>
+                    <p className="text-xs text-zinc-500 truncate max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl" title={url.longUrl}>
+                        {url.longUrl}
+                    </p>
                 </div>
 
                 <div className="flex items-center gap-2 w-full md:w-auto">
                     <button
                         onClick={handleCopy}
-                        className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 border border-white/[0.05] hover:border-white/10 text-white font-semibold text-xs rounded-xl transition duration-200"
+                        className="btn-secondary flex-1 md:flex-initial px-4 h-9 text-xs"
                     >
                         {copied ? (
                             <>
-                                <Check className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
                                 <span className="text-emerald-400">Copied</span>
                             </>
                         ) : (
                             <>
-                                <Copy className="w-3.5 h-3.5 text-slate-400" />
-                                <span>Copy Link</span>
+                                <Copy className="w-3.5 h-3.5" />
+                                <span>Copy</span>
                             </>
                         )}
                     </button>
 
                     <button
                         onClick={() => setShowQr(!showQr)}
-                        className={`flex items-center justify-center p-2.5 rounded-xl border transition-all duration-200 ${
-                            showQr
-                                ? 'bg-indigo-500/10 border-indigo-500/40 text-indigo-400'
-                                : 'bg-slate-900 border-white/[0.05] hover:bg-slate-800 text-slate-400 hover:text-white'
-                        }`}
+                        className={showQr ? `${iconBtn} !border-indigo-500/40 !text-indigo-400 !bg-indigo-500/10` : iconBtn}
                         title="Show QR Code"
                     >
                         <QrCode className="w-4 h-4" />
@@ -120,7 +113,7 @@ export default function UrlCard({ url, onDelete }: UrlCardProps) {
 
                     <Link
                         href={`/stats/${url.shortCode}`}
-                        className="flex items-center justify-center p-2.5 bg-slate-900 border border-white/[0.05] hover:border-white/10 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl transition duration-200"
+                        className={iconBtn}
                         title="View Analytics"
                     >
                         <BarChart3 className="w-4 h-4" />
@@ -130,7 +123,7 @@ export default function UrlCard({ url, onDelete }: UrlCardProps) {
                         <button
                             onClick={handleDelete}
                             disabled={deleting}
-                            className="flex items-center justify-center p-2.5 bg-slate-900/60 border border-white/[0.05] hover:bg-rose-500/10 hover:border-rose-500/20 text-slate-450 hover:text-rose-400 rounded-xl transition duration-200"
+                            className={`${iconBtn} hover:!text-rose-400 hover:!bg-rose-500/10 hover:!border-rose-500/20`}
                             title="Delete Link"
                         >
                             <Trash2 className="w-4 h-4" />
@@ -139,20 +132,20 @@ export default function UrlCard({ url, onDelete }: UrlCardProps) {
                 </div>
             </div>
 
-            {/* Collapsible QR Code Area */}
+            {/* Collapsible QR code */}
             {showQr && (
-                <div className="mt-6 pt-6 border-t border-white/[0.05] flex flex-col items-center justify-center animate-fadeIn relative z-10">
-                    <div className="p-4 bg-white rounded-2xl shadow-inner mb-3">
+                <div className="mt-5 pt-5 border-t border-white/[0.06] flex flex-col items-center animate-fadeIn">
+                    <div className="p-3 bg-white rounded-xl mb-2.5">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={qrCodeUrl}
-                          alt="QR Code"
-                          width={150}
-                          height={150}
-                          className="block"
+                            src={qrCodeUrl}
+                            alt="QR Code"
+                            width={150}
+                            height={150}
+                            className="block"
                         />
                     </div>
-                    <span className="text-xs text-slate-450 font-medium">Scan QR code to access shortened URL</span>
+                    <span className="text-xs text-zinc-500">Scan to open the short link</span>
                 </div>
             )}
         </div>

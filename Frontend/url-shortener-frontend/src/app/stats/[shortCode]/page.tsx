@@ -4,7 +4,7 @@ import React, { useEffect, useState, use } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { fetchApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
-import { Link2, ArrowLeft, MousePointerClick, Globe, Monitor, Compass, Loader2, ArrowUpRight, Calendar, Sparkles, TrendingUp } from 'lucide-react';
+import { ArrowLeft, MousePointerClick, Globe, Monitor, Compass, Loader2, ArrowUpRight, Calendar, TrendingUp } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface ClickLog {
@@ -51,7 +51,7 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
     const { shortCode } = use(params);
     const { user, loading: authLoading } = useAuth();
     const router = useRouter();
-    
+
     const [data, setData] = useState<UrlStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -79,24 +79,24 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
 
     if (authLoading || loading) {
         return (
-            <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-[#030712]">
-                <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
-                <p className="text-slate-400 text-sm font-medium">Loading link analytics...</p>
+            <div className="flex-1 flex flex-col items-center justify-center gap-3">
+                <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
+                <p className="text-zinc-500 text-sm">Loading link analytics…</p>
             </div>
         );
     }
 
     if (error || !data) {
         return (
-            <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-[#030712] px-4">
-                <div className="bg-slate-900 border border-white/[0.06] rounded-3xl p-8 max-w-md w-full text-center space-y-6">
-                    <p className="text-red-400 font-semibold">{error || 'An unexpected error occurred.'}</p>
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 px-4">
+                <div className="card p-8 max-w-md w-full text-center space-y-5">
+                    <p className="text-rose-400 text-sm font-medium">{error || 'An unexpected error occurred.'}</p>
                     <button
                         onClick={() => router.push(user ? '/dashboard' : '/')}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all"
+                        className="btn-secondary px-4 py-2 text-xs"
                     >
                         <ArrowLeft className="w-4 h-4" />
-                        <span>Go Back</span>
+                        <span>Go back</span>
                     </button>
                 </div>
             </div>
@@ -107,57 +107,33 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
     const shortUrl = `${API_URL}/${url.shortCode}`;
 
-    // Helper to get progress bar gradient colors dynamically
-    const getProgressBarColor = (label: string, type: 'country' | 'referrer' | 'device' | 'browser') => {
-        const lower = label.toLowerCase();
-        if (type === 'device') {
-            if (lower.includes('mobile')) return 'from-pink-500 to-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.3)]';
-            if (lower.includes('desktop')) return 'from-blue-500 to-cyan-500 shadow-[0_0_8px_rgba(59,130,246,0.3)]';
-            if (lower.includes('tablet')) return 'from-purple-500 to-violet-500 shadow-[0_0_8px_rgba(168,85,247,0.3)]';
-            return 'from-slate-500 to-slate-650';
-        }
-        if (type === 'browser') {
-            if (lower.includes('chrome')) return 'from-amber-400 to-orange-500 shadow-[0_0_8px_rgba(245,158,11,0.3)]';
-            if (lower.includes('firefox')) return 'from-orange-500 to-red-500 shadow-[0_0_8px_rgba(239,68,68,0.3)]';
-            if (lower.includes('safari')) return 'from-sky-400 to-indigo-500 shadow-[0_0_8px_rgba(56,189,248,0.3)]';
-            if (lower.includes('edge')) return 'from-cyan-400 to-blue-500 shadow-[0_0_8px_rgba(34,211,238,0.3)]';
-            return 'from-slate-500 to-slate-655';
-        }
-        if (type === 'referrer') {
-            if (lower.includes('direct')) return 'from-slate-600 to-slate-700';
-            if (lower.includes('google')) return 'from-emerald-400 to-teal-500 shadow-[0_0_8px_rgba(52,211,153,0.3)]';
-            if (lower.includes('twitter') || lower.includes('x.com') || lower.includes('t.co')) return 'from-sky-400 to-blue-500 shadow-[0_0_8px_rgba(56,189,248,0.3)]';
-            if (lower.includes('facebook') || lower.includes('fb')) return 'from-blue-600 to-indigo-600 shadow-[0_0_8px_rgba(37,99,235,0.3)]';
-            return 'from-violet-500 to-purple-650';
-        }
-        // Default Country or fallback
-        if (label === 'Unknown' || label === 'None') return 'from-slate-500 to-slate-600';
-        return 'from-indigo-500 to-violet-500 shadow-[0_0_8px_rgba(99,102,241,0.3)]';
-    };
+    // Reusable stat tile config: icon + label + value
+    const statTiles = [
+        { icon: MousePointerClick, label: 'Total clicks', value: String(url.clicks) },
+        { icon: Globe, label: 'Top country', value: stats.countries[0]?.country || 'None' },
+        { icon: Monitor, label: 'Top device', value: stats.devices[0]?.device || 'None' },
+        { icon: Compass, label: 'Top browser', value: stats.browsers[0]?.browser || 'None' },
+    ];
 
-    // Helper to render visual progress bars
-    const renderProgressBarList = (
-        items: { label: string; count: number }[],
-        total: number,
-        type: 'country' | 'referrer' | 'device' | 'browser'
-    ) => {
+    // Breakdown lists all share one visual language: a single indigo bar whose
+    // width encodes share-of-clicks; the row label carries identity.
+    const renderBreakdown = (items: { label: string; count: number }[], total: number) => {
         if (items.length === 0) {
-            return <p className="text-xs text-slate-500 italic py-6 text-center">No telemetry logged yet</p>;
+            return <p className="text-xs text-zinc-500 py-6 text-center">No clicks logged yet</p>;
         }
         return (
-            <div className="space-y-4">
+            <div className="space-y-3.5">
                 {items.map((item, index) => {
                     const percentage = total > 0 ? Math.round((item.count / total) * 100) : 0;
-                    const colorClass = getProgressBarColor(item.label, type);
                     return (
-                        <div key={index} className="space-y-2">
-                            <div className="flex justify-between text-xs font-semibold">
-                                <span className="text-slate-350">{item.label}</span>
-                                <span className="text-slate-500 font-mono text-[10px]">{item.count} clicks ({percentage}%)</span>
+                        <div key={index} className="space-y-1.5">
+                            <div className="flex justify-between items-baseline text-xs">
+                                <span className="font-medium text-zinc-300">{item.label}</span>
+                                <span className="text-zinc-500 font-mono text-[11px]">{item.count} · {percentage}%</span>
                             </div>
-                            <div className="w-full bg-[#050814]/75 h-2 rounded-full overflow-hidden border border-white/[0.05]">
+                            <div className="w-full bg-white/[0.05] h-1.5 rounded-full overflow-hidden">
                                 <div
-                                    className={`bg-gradient-to-r ${colorClass} h-full rounded-full transition-all duration-500`}
+                                    className="bg-indigo-400 h-full rounded-full transition-all duration-500"
                                     style={{ width: `${percentage}%` }}
                                 />
                             </div>
@@ -168,120 +144,89 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
         );
     };
 
+    const breakdownSections = [
+        { icon: Globe, title: 'Countries', items: stats.countries.map(c => ({ label: c.country, count: c.count })) },
+        { icon: ArrowUpRight, title: 'Referrers', items: stats.referrers.map(r => ({ label: r.referrer, count: r.count })) },
+        { icon: Monitor, title: 'Devices', items: stats.devices.map(d => ({ label: d.device, count: d.count })) },
+        { icon: Compass, title: 'Browsers', items: stats.browsers.map(b => ({ label: b.browser, count: b.count })) },
+    ];
+
     return (
-        <div className="flex-1 bg-[#030712] px-4 py-12 sm:px-6 lg:px-8 grid-bg">
-            <div className="max-w-6xl mx-auto space-y-8">
-                {/* Navigation Back */}
+        <div className="flex-1 px-4 py-10 sm:px-6 lg:px-8">
+            <div className="max-w-5xl mx-auto space-y-6">
+                {/* Back navigation */}
                 <button
                     onClick={() => router.push(user ? '/dashboard' : '/')}
-                    className="inline-flex items-center gap-2 text-slate-450 hover:text-white transition duration-200 text-xs font-bold uppercase tracking-wider"
+                    className="inline-flex items-center gap-1.5 text-zinc-500 hover:text-white transition-colors text-sm font-medium"
                 >
                     <ArrowLeft className="w-4 h-4" />
-                    <span>Back to Workspace</span>
+                    <span>Back</span>
                 </button>
 
-                {/* URL Title Information */}
-                <div className="bg-slate-900/40 border border-white/[0.06] backdrop-blur-xl rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-xl">
-                    <div className="space-y-2 min-w-0">
-                        <div className="flex items-center gap-2 text-indigo-400 text-xs font-bold uppercase tracking-wider">
-                            <Sparkles className="w-3.5 h-3.5" />
-                            <span>Link Performance Analytics</span>
-                        </div>
-                        <h1 className="text-xl sm:text-2xl font-extrabold text-white break-all flex items-center gap-2 leading-none tracking-tight">
+                {/* Link header */}
+                <div className="card p-5 sm:p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div className="space-y-1.5 min-w-0">
+                        <h1 className="font-mono text-lg sm:text-xl font-medium text-white break-all">
                             {shortUrl}
                         </h1>
                         <a
                             href={url.longUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-slate-400 hover:text-indigo-400 transition flex items-center gap-1 mt-1 font-semibold"
+                            className="text-xs text-zinc-400 hover:text-indigo-400 transition-colors flex items-center gap-1"
                         >
-                            <span className="truncate max-w-xs sm:max-w-md md:max-w-lg lg:max-w-xl">Redirects to: {url.longUrl}</span>
+                            <span className="truncate max-w-xs sm:max-w-md md:max-w-lg lg:max-w-xl">{url.longUrl}</span>
                             <ArrowUpRight className="w-3.5 h-3.5 flex-shrink-0" />
                         </a>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0 text-slate-500 text-xs font-bold uppercase tracking-wider bg-white/[0.02] border border-white/[0.05] px-3.5 py-2 rounded-xl">
-                        <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                        <span>{new Date(url.createdAt).toLocaleDateString()}</span>
+                    <div className="flex items-center gap-1.5 flex-shrink-0 text-zinc-400 text-xs bg-white/[0.03] border border-white/[0.07] px-3 py-1.5 rounded-lg">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>Created {new Date(url.createdAt).toLocaleDateString()}</span>
                     </div>
                 </div>
 
-                {/* Aggregate Metrics */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div className="glass-card rounded-2xl p-6 flex items-center gap-4 border border-white/[0.04] bg-[#0c1020]/45">
-                        <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-400 shadow-[inset_0_2px_4px_rgba(99,102,241,0.1)]">
-                            <MousePointerClick className="w-5 h-5" />
+                {/* Stat tiles */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {statTiles.map(({ icon: Icon, label, value }) => (
+                        <div key={label} className="card p-4 flex items-center gap-3.5">
+                            <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-500/10 text-indigo-400 shrink-0">
+                                <Icon className="w-4.5 h-4.5" />
+                            </div>
+                            <div className="min-w-0">
+                                <span className="section-label">{label}</span>
+                                <p className="text-lg font-bold text-white truncate mt-0.5">{value}</p>
+                            </div>
                         </div>
-                        <div>
-                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Total Clicks</span>
-                            <h3 className="text-xl font-extrabold text-white mt-0.5 tracking-tight">{url.clicks}</h3>
-                        </div>
-                    </div>
-
-                    <div className="glass-card rounded-2xl p-6 flex items-center gap-4 border border-white/[0.04] bg-[#0c1020]/45">
-                        <div className="p-3 bg-violet-500/10 rounded-xl text-violet-400 shadow-[inset_0_2px_4px_rgba(168,85,247,0.1)]">
-                            <Globe className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Top Country</span>
-                            <h3 className="text-xl font-extrabold text-white mt-0.5 tracking-tight">
-                                {stats.countries[0]?.country || 'None'}
-                            </h3>
-                        </div>
-                    </div>
-
-                    <div className="glass-card rounded-2xl p-6 flex items-center gap-4 border border-white/[0.04] bg-[#0c1020]/45">
-                        <div className="p-3 bg-pink-500/10 rounded-xl text-pink-400 shadow-[inset_0_2px_4px_rgba(236,72,153,0.1)]">
-                            <Monitor className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Top Device</span>
-                            <h3 className="text-xl font-extrabold text-white mt-0.5 tracking-tight">
-                                {stats.devices[0]?.device || 'None'}
-                            </h3>
-                        </div>
-                    </div>
-
-                    <div className="glass-card rounded-2xl p-6 flex items-center gap-4 border border-white/[0.04] bg-[#0c1020]/45">
-                        <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-400 shadow-[inset_0_2px_4px_rgba(16,185,129,0.1)]">
-                            <Compass className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Top Browser</span>
-                            <h3 className="text-xl font-extrabold text-white mt-0.5 tracking-tight">
-                                {stats.browsers[0]?.browser || 'None'}
-                            </h3>
-                        </div>
-                    </div>
+                    ))}
                 </div>
 
-                {/* Clicks over time — a 30-day trend line built from stats.clicksByDay */}
-                <div className="glass-card rounded-2xl p-6 border border-white/[0.04] bg-[#0c1020]/25">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-6 border-b border-white/[0.05] pb-4 flex items-center gap-2">
+                {/* Clicks over time — 30-day trend from stats.clicksByDay */}
+                <div className="card p-5 sm:p-6">
+                    <h3 className="section-label mb-5 flex items-center gap-2">
                         <TrendingUp className="w-4 h-4 text-indigo-400" />
-                        <span>Clicks Over Time (Last 30 Days)</span>
+                        <span>Clicks — last 30 days</span>
                     </h3>
                     <ResponsiveContainer width="100%" height={260}>
                         <AreaChart data={stats.clicksByDay} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
                             {/* Indigo fill that fades to transparent under the line */}
                             <defs>
                                 <linearGradient id="clicksGradient" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#6366f1" stopOpacity={0.5} />
-                                    <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+                                    <stop offset="0%" stopColor="#818cf8" stopOpacity={0.35} />
+                                    <stop offset="100%" stopColor="#818cf8" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
                             <XAxis
                                 dataKey="date"
                                 tickFormatter={formatDayLabel}
-                                tick={{ fill: '#64748b', fontSize: 10 }}
+                                tick={{ fill: '#71717a', fontSize: 10 }}
                                 tickLine={false}
                                 axisLine={false}
                                 minTickGap={24}
                             />
                             <YAxis
                                 allowDecimals={false}
-                                tick={{ fill: '#64748b', fontSize: 10 }}
+                                tick={{ fill: '#71717a', fontSize: 10 }}
                                 tickLine={false}
                                 axisLine={false}
                                 width={28}
@@ -289,12 +234,12 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
                             <Tooltip
                                 cursor={{ stroke: 'rgba(129,140,248,0.3)' }}
                                 contentStyle={{
-                                    background: '#0c1020',
-                                    border: '1px solid rgba(255,255,255,0.08)',
-                                    borderRadius: '12px',
+                                    background: '#17171a',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    borderRadius: '10px',
                                     fontSize: '12px',
                                 }}
-                                labelStyle={{ color: '#94a3b8' }}
+                                labelStyle={{ color: '#a1a1aa' }}
                                 labelFormatter={(date) => formatDayLabel(date as string)}
                                 formatter={(value) => [`${value} clicks`, '']}
                             />
@@ -309,92 +254,50 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
                     </ResponsiveContainer>
                 </div>
 
-                {/* Demographics breakdowns */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Country Distribution */}
-                    <div className="glass-card rounded-2xl p-6 border border-white/[0.04] bg-[#0c1020]/25">
-                        <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-6 border-b border-white/[0.05] pb-4 flex items-center gap-2">
-                            <Globe className="w-4 h-4 text-indigo-400" />
-                            <span>Geographic Distribution</span>
-                        </h3>
-                        {renderProgressBarList(
-                            stats.countries.map(c => ({ label: c.country, count: c.count })),
-                            url.clicks,
-                            'country'
-                        )}
-                    </div>
-
-                    {/* Referrers Distribution */}
-                    <div className="glass-card rounded-2xl p-6 border border-white/[0.04] bg-[#0c1020]/25">
-                        <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-6 border-b border-white/[0.05] pb-4 flex items-center gap-2">
-                            <ArrowUpRight className="w-4 h-4 text-violet-400" />
-                            <span>Referral Sources</span>
-                        </h3>
-                        {renderProgressBarList(
-                            stats.referrers.map(r => ({ label: r.referrer, count: r.count })),
-                            url.clicks,
-                            'referrer'
-                        )}
-                    </div>
-
-                    {/* Devices Distribution */}
-                    <div className="glass-card rounded-2xl p-6 border border-white/[0.04] bg-[#0c1020]/25">
-                        <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-6 border-b border-white/[0.05] pb-4 flex items-center gap-2">
-                            <Monitor className="w-4 h-4 text-pink-400" />
-                            <span>Device Categories</span>
-                        </h3>
-                        {renderProgressBarList(
-                            stats.devices.map(d => ({ label: d.device, count: d.count })),
-                            url.clicks,
-                            'device'
-                        )}
-                    </div>
-
-                    {/* Browsers Distribution */}
-                    <div className="glass-card rounded-2xl p-6 border border-white/[0.04] bg-[#0c1020]/25">
-                        <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-6 border-b border-white/[0.05] pb-4 flex items-center gap-2">
-                            <Compass className="w-4 h-4 text-emerald-400" />
-                            <span>Web Browsers</span>
-                        </h3>
-                        {renderProgressBarList(
-                            stats.browsers.map(b => ({ label: b.browser, count: b.count })),
-                            url.clicks,
-                            'browser'
-                        )}
-                    </div>
+                {/* Breakdowns: countries / referrers / devices / browsers */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {breakdownSections.map(({ icon: Icon, title, items }) => (
+                        <div key={title} className="card p-5 sm:p-6">
+                            <h3 className="section-label mb-5 flex items-center gap-2">
+                                <Icon className="w-4 h-4 text-indigo-400" />
+                                <span>{title}</span>
+                            </h3>
+                            {renderBreakdown(items, url.clicks)}
+                        </div>
+                    ))}
                 </div>
 
-                {/* Raw logs */}
-                <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/[0.04] bg-[#0c1020]/25">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-6 border-b border-white/[0.05] pb-4">Recent Click Stream</h3>
+                {/* Recent click log */}
+                <div className="card p-5 sm:p-6">
+                    <h3 className="section-label mb-5">Recent clicks</h3>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs border-collapse">
                             <thead>
-                                <tr className="text-slate-500 border-b border-white/[0.05] font-bold uppercase tracking-wider text-[10px]">
-                                    <th className="py-4 px-4">Time</th>
-                                    <th className="py-4 px-4">Location</th>
-                                    <th className="py-4 px-4">Device Class</th>
-                                    <th className="py-4 px-4">Browser Name</th>
-                                    <th className="py-4 px-4">Referrer URL</th>
+                                <tr className="text-zinc-500 border-b border-white/[0.06]">
+                                    <th className="py-3 px-3 font-medium">Time</th>
+                                    <th className="py-3 px-3 font-medium">Country</th>
+                                    <th className="py-3 px-3 font-medium">Device</th>
+                                    <th className="py-3 px-3 font-medium">Browser</th>
+                                    <th className="py-3 px-3 font-medium">Referrer</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-white/[0.03] text-slate-300 font-medium">
+                            <tbody className="divide-y divide-white/[0.04] text-zinc-300">
                                 {stats.recentClicks.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="py-8 text-center text-slate-500 italic">
+                                        <td colSpan={5} className="py-8 text-center text-zinc-500">
                                             No clicks tracked yet
                                         </td>
                                     </tr>
                                 ) : (
                                     stats.recentClicks.map((click) => (
-                                        <tr key={click.id} className="hover:bg-white/[0.02] transition-colors duration-150">
-                                            <td className="py-4 px-4 font-mono text-slate-450">
+                                        <tr key={click.id} className="hover:bg-white/[0.02] transition-colors">
+                                            <td className="py-3 px-3 font-mono text-zinc-400 whitespace-nowrap">
                                                 {new Date(click.clickedAt).toLocaleString()}
                                             </td>
-                                            <td className="py-4 px-4 font-bold text-slate-200">{click.country || 'Unknown'}</td>
-                                            <td className="py-4 px-4 text-slate-400">{click.device || 'Unknown'}</td>
-                                            <td className="py-4 px-4 text-slate-400">{click.browser || 'Unknown'}</td>
-                                            <td className="py-4 px-4 truncate max-w-xs text-slate-450" title={click.referrer || ''}>
+                                            <td className="py-3 px-3 font-medium text-zinc-200">{click.country || 'Unknown'}</td>
+                                            <td className="py-3 px-3 text-zinc-400">{click.device || 'Unknown'}</td>
+                                            <td className="py-3 px-3 text-zinc-400">{click.browser || 'Unknown'}</td>
+                                            <td className="py-3 px-3 truncate max-w-xs text-zinc-400" title={click.referrer || ''}>
                                                 {click.referrer || 'Direct'}
                                             </td>
                                         </tr>

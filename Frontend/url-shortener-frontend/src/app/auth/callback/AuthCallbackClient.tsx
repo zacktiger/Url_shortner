@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { Loader2 } from 'lucide-react';
 
 export default function AuthCallbackClient() {
   const { login } = useAuth();
@@ -26,9 +27,9 @@ export default function AuthCallbackClient() {
   }, [login, router, searchParams]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-      <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
-      <p className="text-slate-400 text-sm">Signing you in…</p>
+    <div className="flex-1 flex flex-col items-center justify-center gap-3">
+      <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
+      <p className="text-zinc-500 text-sm">Signing you in…</p>
     </div>
   );
 }
