@@ -21,7 +21,7 @@ A high-performance, production-ready URL shortener built with a modern full-stac
 - **QR Code Generation** — every short URL gets an auto-generated QR code (PNG or data URL)
 - **Click Analytics** — track total clicks, browsers, devices, and referrers per URL
 - **Google OAuth + JWT** — one-click sign-in, JWT token valid for 7 days, used on all protected routes
-- **Rate Limiting** — 30 URL creates/15min, 200 redirects/min, 10 auth attempts/15min
+- **Rate Limiting** — 20 URL creates/hour per IP, plus a global 200 requests/15min cap
 - **Dashboard** — manage all your links, view stats, delete URLs
 
 ## 📁 Project Structure
@@ -134,8 +134,9 @@ docker compose up --build
 |---|---|---|---|
 | `POST` | `/url` | Optional | Create short URL |
 | `GET` | `/:shortCode` | — | Redirect to original URL |
-| `GET` | `/url/:shortCode/qr` | — | Get QR code |
-| `GET` | `/url/:shortCode/stats` | Required | Click analytics |
+| `GET` | `/url/:shortCode/qr` | — | QR code — PNG by default, `?format=dataurl` for a JSON data URL |
+| `GET` | `/analytics/:shortCode` | Optional | Click analytics for one URL (owner-only if the link belongs to a user) |
+| `GET` | `/analytics/dashboard` | Required | Summary stats across the caller's URLs |
 | `GET` | `/auth/google` | — | Start OAuth flow |
 | `GET` | `/auth/google/callback` | — | OAuth callback |
 | `GET` | `/auth/me` | Required | Current user |
