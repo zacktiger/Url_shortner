@@ -1,138 +1,157 @@
 @import "tailwindcss";
 
+/*
+ * SnapLink design system
+ * ----------------------
+ * One dark neutral canvas, one accent color (indigo), and a mono font for
+ * anything machine-y (short codes, URLs, numbers). Everything else is
+ * standard Tailwind utilities — these tokens and small component classes
+ * keep the JSX readable and the look consistent across pages.
+ */
+
 @theme {
-  --color-slate-950: #030712;
-  --color-slate-900: #0b0f19;
-  --color-slate-850: #111827;
-  --color-slate-800: #1f2937;
-  
-  --animate-glow: glow 4s ease-in-out infinite;
-  --animate-float: float 6s ease-in-out infinite;
-  
-  @keyframes glow {
-    0%, 100% { opacity: 0.8; filter: drop-shadow(0 0 15px rgba(99, 102, 241, 0.4)); }
-    50% { opacity: 1; filter: drop-shadow(0 0 30px rgba(168, 85, 247, 0.6)); }
-  }
-  @keyframes float {
-    0%, 100% { transform: translateY(0px) rotate(0deg); }
-    50% { transform: translateY(-10px) rotate(1deg); }
-  }
+  /* Fonts are injected as CSS variables by next/font in layout.tsx */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  /* Neutral dark surfaces (page canvas → raised cards) */
+  --color-canvas: #09090b;
+  --color-surface: #111113;
+  --color-surface-2: #17171a;
 }
 
-/* Base custom styles */
 body {
-  background-color: #030712;
-  color: #f3f4f6;
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.1) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(236, 72, 153, 0.08) 0px, transparent 50%);
-  background-attachment: fixed;
+  background-color: var(--color-canvas);
+  color: #e4e4e7; /* zinc-200 */
   overflow-x: hidden;
 }
 
-/* Custom Utilities */
-.glass-panel {
-  background: rgba(17, 24, 39, 0.45);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+/* ---- Component classes ------------------------------------------------ */
+
+/* Raised card on the dark canvas: solid surface + hairline border. */
+.card {
+  background-color: var(--color-surface);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
 }
 
-.glass-card {
-  background: rgba(15, 23, 42, 0.35);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+/* Cards that are hover targets brighten their border, nothing else. */
+.card-hover {
+  transition: border-color 0.2s ease;
+}
+.card-hover:hover {
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
-.glass-card:hover {
-  border-color: rgba(99, 102, 241, 0.25);
-  box-shadow: 0 12px 40px 0 rgba(99, 102, 241, 0.08);
-  transform: translateY(-2px);
+/* Solid accent button — the only strongly-colored element on a page. */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background-color: #6366f1; /* indigo-500 */
+  color: #fff;
+  font-weight: 600;
+  border-radius: 10px;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+.btn-primary:hover {
+  background-color: #4f46e5; /* indigo-600 */
+}
+.btn-primary:active {
+  transform: scale(0.98);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.glow-btn {
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s ease;
+/* Quiet button for secondary actions (refresh, copy, sign-in prompts). */
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: #e4e4e7;
+  font-weight: 500;
+  border-radius: 10px;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.btn-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
-.glow-btn::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -50%;
-  width: 200%;
-  height: 100%;
-  background: linear-gradient(
-    to right,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.15) 50%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  transform: skewX(-25deg);
-  transition: 0.75s;
-  opacity: 0;
+/* Text inputs share one look: dark well + indigo focus ring. */
+.input-field {
+  width: 100%;
+  background-color: var(--color-canvas);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  color: #fff;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.input-field::placeholder {
+  color: #52525b; /* zinc-600 */
+}
+.input-field:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
 }
 
-.glow-btn:hover::after {
-  left: 125%;
-  opacity: 1;
+/* Tiny uppercase heading used above sections and stat tiles. */
+.section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #71717a; /* zinc-500 */
 }
 
-.glow-text {
-  text-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
-}
+/* ---- Scrollbar -------------------------------------------------------- */
 
-/* Linear Grid Overlay Background */
-.grid-bg {
-  background-size: 40px 40px;
-  background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-}
-
-/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(3, 7, 18, 0.6);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 9999px;
-  border: 2px solid #030712;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.22);
 }
 
-/* Animations */
+/* ---- Motion ----------------------------------------------------------- */
+
 @keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
-
 .animate-slideUp {
-  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
-
 .animate-fadeIn {
   animation: fadeIn 0.3s ease-out forwards;
 }
