@@ -72,6 +72,7 @@ export async function handleRedirect(req, res) {
 
         if (cachedData) {
             // Cache hit — increment clicks & track analytics async, redirect immediately
+            console.log(`[cache] HIT  ${shortCode}`);
             prisma.url.update({
                 where: { shortCode },
                 data: { clicks: { increment: 1 } },
@@ -83,6 +84,7 @@ export async function handleRedirect(req, res) {
         }
 
         // 2. Cache miss — query Postgres
+        console.log(`[cache] MISS ${shortCode} — querying Postgres`);
         const urlRecord = await prisma.url.findUnique({ where: { shortCode } });
 
         if (!urlRecord) {
