@@ -4,7 +4,8 @@ import React, { useEffect, useState, use } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { fetchApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
-import { Link2, ArrowLeft, MousePointerClick, Globe, Monitor, Compass, Loader2, ArrowUpRight, Calendar, Sparkles } from 'lucide-react';
+import { Link2, ArrowLeft, MousePointerClick, Globe, Monitor, Compass, Loader2, ArrowUpRight, Calendar, Sparkles, TrendingUp } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface ClickLog {
     id: number;
@@ -28,8 +29,18 @@ interface UrlStats {
         devices: { device: string; count: number }[];
         browsers: { browser: string; count: number }[];
         referrers: { referrer: string; count: number }[];
+        // One entry per day for the last 30 days (0-filled), oldest first
+        clicksByDay: { date: string; count: number }[];
         recentClicks: ClickLog[];
     };
+}
+
+// Turn an ISO date like '2026-07-18' into a compact 'Jul 18' axis label
+function formatDayLabel(date: string) {
+    return new Date(`${date}T00:00:00`).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+    });
 }
 
 interface StatsPageProps {
@@ -242,6 +253,60 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
                             </h3>
                         </div>
                     </div>
+                </div>
+
+                {/* Clicks over time — a 30-day trend line built from stats.clicksByDay */}
+                <div className="glass-card rounded-2xl p-6 border border-white/[0.04] bg-[#0c1020]/25">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-6 border-b border-white/[0.05] pb-4 flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-indigo-400" />
+                        <span>Clicks Over Time (Last 30 Days)</span>
+                    </h3>
+                    <ResponsiveContainer width="100%" height={260}>
+                        <AreaChart data={stats.clicksByDay} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+                            {/* Indigo fill that fades to transparent under the line */}
+                            <defs>
+                                <linearGradient id="clicksGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#6366f1" stopOpacity={0.5} />
+                                    <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                            <XAxis
+                                dataKey="date"
+                                tickFormatter={formatDayLabel}
+                                tick={{ fill: '#64748b', fontSize: 10 }}
+                                tickLine={false}
+                                axisLine={false}
+                                minTickGap={24}
+                            />
+                            <YAxis
+                                allowDecimals={false}
+                                tick={{ fill: '#64748b', fontSize: 10 }}
+                                tickLine={false}
+                                axisLine={false}
+                                width={28}
+                            />
+                            <Tooltip
+                                cursor={{ stroke: 'rgba(129,140,248,0.3)' }}
+                                contentStyle={{
+                                    background: '#0c1020',
+                                    border: '1px solid rgba(255,255,255,0.08)',
+                                    borderRadius: '12px',
+                                    fontSize: '12px',
+                                }}
+                                labelStyle={{ color: '#94a3b8' }}
+                                labelFormatter={(date) => formatDayLabel(date as string)}
+                                formatter={(value) => [`${value} clicks`, '']}
+                            />
+                            <Area
+                                type="monotone"
+                                dataKey="count"
+                                stroke="#818cf8"
+                                strokeWidth={2}
+                                fill="url(#clicksGradient)"
+                            />
+                        </AreaChart>
+                    </ResponsiveContainer>
                 </div>
 
                 {/* Demographics breakdowns */}

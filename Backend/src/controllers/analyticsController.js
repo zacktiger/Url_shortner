@@ -1,6 +1,47 @@
 import prisma from '../config/db.js';
 
 /**
+ * Builds a daily click count series for the last `days` days for one URL.
+ *
+ * We use a raw SQL query here because Prisma's groupBy can only group by an
+ * exact timestamp, not by calendar day. Postgres' TO_CHAR truncates each
+ * click's timestamp down to a 'YYYY-MM-DD' string so all clicks on the same
+ * day fall into one bucket.
+ *
+ * The DB only returns days that actually had clicks, so we then "gap-fill":
+ * we walk every day in the window and default missing days to 0. This gives
+ * the frontend a continuous series (no holes) that charts cleanly.
+ *
+ * @param {number} urlId - The URL whose clicks we're counting.
+ * @param {number} days  - How many days back to include (default 30).
+ * @returns {Promise<{ date: string, count: number }[]>} Oldest day first.
+ */
+async function getClicksByDay(urlId, days = 30) {
+    // One row per day that had at least one click, e.g. { date: '2026-07-18', count: 5 }
+    const rowsWithClicks = await prisma.$queryRaw`
+        SELECT TO_CHAR("clickedAt", 'YYYY-MM-DD') AS date, COUNT(*)::int AS count
+        FROM "Analytics"
+        WHERE "urlId" = ${urlId}
+          AND "clickedAt" >= NOW() - (${days} || ' days')::interval
+        GROUP BY 1
+        ORDER BY 1
+    `;
+
+    // Look up counts by day so gap-filling is a quick Map lookup.
+    const countByDate = new Map(rowsWithClicks.map((row) => [row.date, row.count]));
+
+    // Produce one entry for every day in the window, oldest to newest.
+    const series = [];
+    for (let daysAgo = days - 1; daysAgo >= 0; daysAgo--) {
+        const day = new Date();
+        day.setUTCDate(day.getUTCDate() - daysAgo);
+        const dateKey = day.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+        series.push({ date: dateKey, count: countByDate.get(dateKey) || 0 });
+    }
+    return series;
+}
+
+/**
  * Returns detailed analytics for a specific short URL.
  * Enforces ownership if the URL belongs to a registered user.
  */
@@ -57,6 +98,9 @@ export async function getUrlAnalytics(req, res) {
             orderBy: { _count: { id: 'desc' } },
         });
 
+        // Daily click totals for the last 30 days (powers the "clicks over time" chart)
+        const clicksByDay = await getClicksByDay(urlRecord.id, 30);
+
         return res.status(200).json({
             success: true,
             url: {
@@ -71,6 +115,7 @@ export async function getUrlAnalytics(req, res) {
                 devices: devices.map((d) => ({ device: d.device || 'Unknown', count: d._count.id })),
                 browsers: browsers.map((b) => ({ browser: b.browser || 'Unknown', count: b._count.id })),
                 referrers: referrers.map((r) => ({ referrer: r.referrer || 'Direct', count: r._count.id })),
+                clicksByDay,
                 recentClicks: urlRecord.analytics.slice(0, 10),
             },
         });
