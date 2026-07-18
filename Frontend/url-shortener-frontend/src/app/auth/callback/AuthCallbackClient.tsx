@@ -28,8 +28,8 @@ export default function AuthCallbackClient() {
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-3">
-      <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
-      <p className="text-zinc-500 text-sm">Signing you in…</p>
+      <Loader2 className="w-8 h-8 text-accent-bright animate-spin" />
+      <p className="text-stone-500 text-sm">Signing you in…</p>
     </div>
   );
 }

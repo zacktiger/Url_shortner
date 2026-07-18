@@ -6,8 +6,8 @@ export default function AuthCallbackPage() {
     <Suspense
       fallback={
         <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-          <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
-          <p className="text-slate-400 text-sm">Signing you in…</p>
+          <div className="w-12 h-12 border-4 border-accent/30 border-t-accent rounded-full animate-spin" />
+          <p className="text-stone-400 text-sm">Signing you in…</p>
         </div>
       }
     >

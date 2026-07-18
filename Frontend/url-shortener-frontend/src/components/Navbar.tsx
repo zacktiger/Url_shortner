@@ -14,15 +14,13 @@ export default function Navbar() {
     };
 
     return (
-        <nav className="sticky top-0 z-50 bg-canvas/80 backdrop-blur-md border-b border-white/[0.06]">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <nav className="sticky top-0 z-50 bg-canvas/85 backdrop-blur-md border-b border-white/[0.06]">
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
-                    {/* Logo */}
-                    <Link href="/" className="flex items-center gap-2.5 group">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-500 group-hover:bg-indigo-400 transition-colors">
-                            <Link2 className="w-4.5 h-4.5 text-white" />
-                        </div>
-                        <span className="text-lg font-semibold tracking-tight text-white">
+                    {/* Wordmark */}
+                    <Link href="/" className="flex items-center gap-2 group">
+                        <Link2 className="w-5 h-5 text-accent-bright -rotate-45 transition-transform duration-300 group-hover:rotate-0" />
+                        <span className="font-display text-lg font-bold tracking-tight text-white">
                             SnapLink
                         </span>
                     </Link>
@@ -33,19 +31,19 @@ export default function Navbar() {
                             <>
                                 <Link
                                     href="/dashboard"
-                                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-zinc-400 hover:text-white rounded-lg hover:bg-white/[0.05] transition-colors"
+                                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-stone-400 hover:text-white rounded-lg hover:bg-white/[0.05] transition-colors"
                                 >
                                     <LayoutDashboard className="w-4 h-4" />
                                     <span>Dashboard</span>
                                 </Link>
 
-                                <span className="hidden sm:block px-3 py-2 text-sm text-zinc-500 truncate max-w-[160px]">
+                                <span className="hidden sm:block px-3 py-2 text-sm text-stone-500 truncate max-w-[160px]">
                                     {user.name}
                                 </span>
 
                                 <button
                                     onClick={logout}
-                                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-zinc-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/[0.08] transition-colors"
+                                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-stone-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/[0.08] transition-colors"
                                 >
                                     <LogOut className="w-4 h-4" />
                                     <span className="hidden sm:inline">Logout</span>

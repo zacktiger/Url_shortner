@@ -58,7 +58,7 @@ export default function UrlCard({ url, onDelete }: UrlCardProps) {
     };
 
     // Small icon-only action button used for QR / stats / delete
-    const iconBtn = "flex items-center justify-center w-9 h-9 rounded-lg border border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:text-white hover:bg-white/[0.07] transition-colors";
+    const iconBtn = "flex items-center justify-center w-9 h-9 rounded-lg border border-white/[0.08] bg-white/[0.03] text-stone-400 hover:text-white hover:bg-white/[0.07] transition-colors";
 
     return (
         <div className="card card-hover p-5">
@@ -69,7 +69,7 @@ export default function UrlCard({ url, onDelete }: UrlCardProps) {
                             href={shortUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="font-mono text-sm sm:text-base font-medium text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1.5 break-all"
+                            className="font-mono text-sm sm:text-base font-medium text-accent-bright hover:text-white transition-colors flex items-center gap-1.5 break-all"
                         >
                             {shortUrl}
                             <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
@@ -80,7 +80,7 @@ export default function UrlCard({ url, onDelete }: UrlCardProps) {
                             </span>
                         )}
                     </div>
-                    <p className="text-xs text-zinc-500 truncate max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl" title={url.longUrl}>
+                    <p className="text-xs text-stone-500 truncate max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl" title={url.longUrl}>
                         {url.longUrl}
                     </p>
                 </div>
@@ -105,7 +105,7 @@ export default function UrlCard({ url, onDelete }: UrlCardProps) {
 
                     <button
                         onClick={() => setShowQr(!showQr)}
-                        className={showQr ? `${iconBtn} !border-indigo-500/40 !text-indigo-400 !bg-indigo-500/10` : iconBtn}
+                        className={showQr ? `${iconBtn} !border-accent/50 !text-accent-bright !bg-accent/10` : iconBtn}
                         title="Show QR Code"
                     >
                         <QrCode className="w-4 h-4" />
@@ -145,7 +145,7 @@ export default function UrlCard({ url, onDelete }: UrlCardProps) {
                             className="block"
                         />
                     </div>
-                    <span className="text-xs text-zinc-500">Scan to open the short link</span>
+                    <span className="text-xs text-stone-500">Scan to open the short link</span>
                 </div>
             )}
         </div>

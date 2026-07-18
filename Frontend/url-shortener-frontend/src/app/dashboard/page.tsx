@@ -6,7 +6,19 @@ import { fetchApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import UrlShortenerForm from '@/components/UrlShortenerForm';
 import UrlCard from '@/components/UrlCard';
-import { Link2, MousePointerClick, Loader2, RefreshCw, Search } from 'lucide-react';
+import { Link2, Loader2, RefreshCw, Search } from 'lucide-react';
+import { useCountUp } from '@/lib/useCountUp';
+
+// Stat tile with a number that counts up when the dashboard loads.
+function StatTile({ label, value }: { label: string; value: number }) {
+    const animated = useCountUp(value);
+    return (
+        <div className="card p-5">
+            <span className="section-label">{label}</span>
+            <p className="text-3xl font-bold text-white font-mono tabular-nums mt-1.5">{animated}</p>
+        </div>
+    );
+}
 
 interface UrlRecord {
     id: number;
@@ -76,8 +88,8 @@ export default function Dashboard() {
     if (authLoading || (user && loading && !stats)) {
         return (
             <div className="flex-1 flex flex-col items-center justify-center gap-3">
-                <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
-                <p className="text-zinc-500 text-sm">Loading dashboard…</p>
+                <Loader2 className="w-8 h-8 text-accent-bright animate-spin" />
+                <p className="text-stone-500 text-sm">Loading dashboard…</p>
             </div>
         );
     }
@@ -88,12 +100,12 @@ export default function Dashboard() {
 
     return (
         <div className="flex-1 px-4 py-10 sm:px-6 lg:px-8">
-            <div className="max-w-5xl mx-auto space-y-8">
+            <div className="max-w-5xl mx-auto space-y-8 stagger">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-white tracking-tight">Dashboard</h1>
-                        <p className="text-sm text-zinc-400 mt-1">Manage your links and track their performance</p>
+                        <h1 className="font-display text-3xl font-bold text-white tracking-tight">Dashboard</h1>
+                        <p className="text-sm text-stone-400 mt-1">Manage your links and track their performance</p>
                     </div>
                     <button
                         onClick={loadDashboardData}
@@ -108,25 +120,8 @@ export default function Dashboard() {
                 {/* Stat tiles */}
                 {stats && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="card p-5 flex items-center gap-4">
-                            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-indigo-500/10 text-indigo-400">
-                                <Link2 className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <span className="section-label">Active links</span>
-                                <p className="text-2xl font-bold text-white font-mono mt-0.5">{stats.totalUrls}</p>
-                            </div>
-                        </div>
-
-                        <div className="card p-5 flex items-center gap-4">
-                            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400">
-                                <MousePointerClick className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <span className="section-label">Total clicks</span>
-                                <p className="text-2xl font-bold text-white font-mono mt-0.5">{stats.totalClicks}</p>
-                            </div>
-                        </div>
+                        <StatTile label="Active links" value={stats.totalUrls} />
+                        <StatTile label="Total clicks" value={stats.totalClicks} />
                     </div>
                 )}
 
@@ -143,7 +138,7 @@ export default function Dashboard() {
 
                         {stats && stats.urls.length > 0 && (
                             <div className="relative w-full sm:w-72">
-                                <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                                <Search className="w-4 h-4 text-stone-500 absolute left-3 top-1/2 -translate-y-1/2" />
                                 <input
                                     type="text"
                                     placeholder="Search by code or destination…"
@@ -163,11 +158,11 @@ export default function Dashboard() {
 
                     {!loading && stats?.urls.length === 0 && (
                         <div className="card p-12 text-center">
-                            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.04] text-zinc-500 mx-auto mb-4">
+                            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.04] text-stone-500 mx-auto mb-4">
                                 <Link2 className="w-6 h-6" />
                             </div>
-                            <h4 className="text-sm font-semibold text-zinc-300">No links yet</h4>
-                            <p className="text-sm text-zinc-500 mt-1">Shorten your first link above to start tracking clicks.</p>
+                            <h4 className="text-sm font-semibold text-stone-300">No links yet</h4>
+                            <p className="text-sm text-stone-500 mt-1">Shorten your first link above to start tracking clicks.</p>
                         </div>
                     )}
 
@@ -181,7 +176,7 @@ export default function Dashboard() {
                             if (filtered.length === 0) {
                                 return (
                                     <div className="card p-10 text-center">
-                                        <p className="text-zinc-400 text-sm">No links matching &quot;{searchQuery}&quot; found.</p>
+                                        <p className="text-stone-400 text-sm">No links matching &quot;{searchQuery}&quot; found.</p>
                                     </div>
                                 );
                             }

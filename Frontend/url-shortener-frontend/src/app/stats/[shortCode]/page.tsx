@@ -4,8 +4,15 @@ import React, { useEffect, useState, use } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { fetchApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, MousePointerClick, Globe, Monitor, Compass, Loader2, ArrowUpRight, Calendar, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Loader2, ArrowUpRight, Calendar } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useCountUp } from '@/lib/useCountUp';
+
+// Numeric tile values count up on load; text values render as-is.
+function StatValue({ value }: { value: string | number }) {
+    const animated = useCountUp(typeof value === 'number' ? value : 0);
+    return <>{typeof value === 'number' ? animated : value}</>;
+}
 
 interface ClickLog {
     id: number;
@@ -80,8 +87,8 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
     if (authLoading || loading) {
         return (
             <div className="flex-1 flex flex-col items-center justify-center gap-3">
-                <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
-                <p className="text-zinc-500 text-sm">Loading link analytics…</p>
+                <Loader2 className="w-8 h-8 text-accent-bright animate-spin" />
+                <p className="text-stone-500 text-sm">Loading link analytics…</p>
             </div>
         );
     }
@@ -107,19 +114,19 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
     const shortUrl = `${API_URL}/${url.shortCode}`;
 
-    // Reusable stat tile config: icon + label + value
-    const statTiles = [
-        { icon: MousePointerClick, label: 'Total clicks', value: String(url.clicks) },
-        { icon: Globe, label: 'Top country', value: stats.countries[0]?.country || 'None' },
-        { icon: Monitor, label: 'Top device', value: stats.devices[0]?.device || 'None' },
-        { icon: Compass, label: 'Top browser', value: stats.browsers[0]?.browser || 'None' },
+    // Reusable stat tile config: label + value (clicks animate via count-up)
+    const statTiles: { label: string; value: string | number }[] = [
+        { label: 'Total clicks', value: url.clicks },
+        { label: 'Top country', value: stats.countries[0]?.country || 'None' },
+        { label: 'Top device', value: stats.devices[0]?.device || 'None' },
+        { label: 'Top browser', value: stats.browsers[0]?.browser || 'None' },
     ];
 
-    // Breakdown lists all share one visual language: a single indigo bar whose
+    // Breakdown lists all share one visual language: a single accent bar whose
     // width encodes share-of-clicks; the row label carries identity.
     const renderBreakdown = (items: { label: string; count: number }[], total: number) => {
         if (items.length === 0) {
-            return <p className="text-xs text-zinc-500 py-6 text-center">No clicks logged yet</p>;
+            return <p className="text-xs text-stone-500 py-6 text-center">No clicks logged yet</p>;
         }
         return (
             <div className="space-y-3.5">
@@ -128,12 +135,12 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
                     return (
                         <div key={index} className="space-y-1.5">
                             <div className="flex justify-between items-baseline text-xs">
-                                <span className="font-medium text-zinc-300">{item.label}</span>
-                                <span className="text-zinc-500 font-mono text-[11px]">{item.count} · {percentage}%</span>
+                                <span className="font-medium text-stone-300">{item.label}</span>
+                                <span className="text-stone-500 font-mono text-[11px]">{item.count} · {percentage}%</span>
                             </div>
                             <div className="w-full bg-white/[0.05] h-1.5 rounded-full overflow-hidden">
                                 <div
-                                    className="bg-indigo-400 h-full rounded-full transition-all duration-500"
+                                    className="bg-accent-bright h-full rounded-full transition-all duration-500"
                                     style={{ width: `${percentage}%` }}
                                 />
                             </div>
@@ -145,19 +152,19 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
     };
 
     const breakdownSections = [
-        { icon: Globe, title: 'Countries', items: stats.countries.map(c => ({ label: c.country, count: c.count })) },
-        { icon: ArrowUpRight, title: 'Referrers', items: stats.referrers.map(r => ({ label: r.referrer, count: r.count })) },
-        { icon: Monitor, title: 'Devices', items: stats.devices.map(d => ({ label: d.device, count: d.count })) },
-        { icon: Compass, title: 'Browsers', items: stats.browsers.map(b => ({ label: b.browser, count: b.count })) },
+        { title: 'Countries', items: stats.countries.map(c => ({ label: c.country, count: c.count })) },
+        { title: 'Referrers', items: stats.referrers.map(r => ({ label: r.referrer, count: r.count })) },
+        { title: 'Devices', items: stats.devices.map(d => ({ label: d.device, count: d.count })) },
+        { title: 'Browsers', items: stats.browsers.map(b => ({ label: b.browser, count: b.count })) },
     ];
 
     return (
         <div className="flex-1 px-4 py-10 sm:px-6 lg:px-8">
-            <div className="max-w-5xl mx-auto space-y-6">
+            <div className="max-w-5xl mx-auto space-y-6 stagger">
                 {/* Back navigation */}
                 <button
                     onClick={() => router.push(user ? '/dashboard' : '/')}
-                    className="inline-flex items-center gap-1.5 text-zinc-500 hover:text-white transition-colors text-sm font-medium"
+                    className="inline-flex items-center gap-1.5 text-stone-500 hover:text-white transition-colors text-sm font-medium"
                 >
                     <ArrowLeft className="w-4 h-4" />
                     <span>Back</span>
@@ -173,80 +180,74 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
                             href={url.longUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-zinc-400 hover:text-indigo-400 transition-colors flex items-center gap-1"
+                            className="text-xs text-stone-400 hover:text-accent-bright transition-colors flex items-center gap-1"
                         >
                             <span className="truncate max-w-xs sm:max-w-md md:max-w-lg lg:max-w-xl">{url.longUrl}</span>
                             <ArrowUpRight className="w-3.5 h-3.5 flex-shrink-0" />
                         </a>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0 text-zinc-400 text-xs bg-white/[0.03] border border-white/[0.07] px-3 py-1.5 rounded-lg">
+                    <div className="flex items-center gap-1.5 flex-shrink-0 text-stone-400 text-xs bg-white/[0.03] border border-white/[0.07] px-3 py-1.5 rounded-lg">
                         <Calendar className="w-3.5 h-3.5" />
                         <span>Created {new Date(url.createdAt).toLocaleDateString()}</span>
                     </div>
                 </div>
 
                 {/* Stat tiles */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {statTiles.map(({ icon: Icon, label, value }) => (
-                        <div key={label} className="card p-4 flex items-center gap-3.5">
-                            <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-500/10 text-indigo-400 shrink-0">
-                                <Icon className="w-4.5 h-4.5" />
-                            </div>
-                            <div className="min-w-0">
-                                <span className="section-label">{label}</span>
-                                <p className="text-lg font-bold text-white truncate mt-0.5">{value}</p>
-                            </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    {statTiles.map(({ label, value }) => (
+                        <div key={label} className="card p-5 min-w-0">
+                            <span className="section-label">{label}</span>
+                            <p className="text-2xl font-bold text-white font-mono tabular-nums truncate mt-1.5">
+                                <StatValue value={value} />
+                            </p>
                         </div>
                     ))}
                 </div>
 
                 {/* Clicks over time — 30-day trend from stats.clicksByDay */}
                 <div className="card p-5 sm:p-6">
-                    <h3 className="section-label mb-5 flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-indigo-400" />
-                        <span>Clicks — last 30 days</span>
-                    </h3>
+                    <h3 className="section-label mb-5">Clicks — last 30 days</h3>
                     <ResponsiveContainer width="100%" height={260}>
                         <AreaChart data={stats.clicksByDay} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
-                            {/* Indigo fill that fades to transparent under the line */}
+                            {/* Cobalt fill that fades to transparent under the line */}
                             <defs>
                                 <linearGradient id="clicksGradient" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#818cf8" stopOpacity={0.35} />
-                                    <stop offset="100%" stopColor="#818cf8" stopOpacity={0} />
+                                    <stop offset="0%" stopColor="#6b93ff" stopOpacity={0.35} />
+                                    <stop offset="100%" stopColor="#6b93ff" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
                             <XAxis
                                 dataKey="date"
                                 tickFormatter={formatDayLabel}
-                                tick={{ fill: '#71717a', fontSize: 10 }}
+                                tick={{ fill: '#8a877f', fontSize: 10, fontFamily: 'var(--font-mono)' }}
                                 tickLine={false}
                                 axisLine={false}
                                 minTickGap={24}
                             />
                             <YAxis
                                 allowDecimals={false}
-                                tick={{ fill: '#71717a', fontSize: 10 }}
+                                tick={{ fill: '#8a877f', fontSize: 10, fontFamily: 'var(--font-mono)' }}
                                 tickLine={false}
                                 axisLine={false}
                                 width={28}
                             />
                             <Tooltip
-                                cursor={{ stroke: 'rgba(129,140,248,0.3)' }}
+                                cursor={{ stroke: 'rgba(107,147,255,0.3)' }}
                                 contentStyle={{
-                                    background: '#17171a',
+                                    background: '#201f1e',
                                     border: '1px solid rgba(255,255,255,0.1)',
                                     borderRadius: '10px',
                                     fontSize: '12px',
                                 }}
-                                labelStyle={{ color: '#a1a1aa' }}
+                                labelStyle={{ color: '#a8a59e' }}
                                 labelFormatter={(date) => formatDayLabel(date as string)}
                                 formatter={(value) => [`${value} clicks`, '']}
                             />
                             <Area
                                 type="monotone"
                                 dataKey="count"
-                                stroke="#818cf8"
+                                stroke="#6b93ff"
                                 strokeWidth={2}
                                 fill="url(#clicksGradient)"
                             />
@@ -256,12 +257,9 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
 
                 {/* Breakdowns: countries / referrers / devices / browsers */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {breakdownSections.map(({ icon: Icon, title, items }) => (
+                    {breakdownSections.map(({ title, items }) => (
                         <div key={title} className="card p-5 sm:p-6">
-                            <h3 className="section-label mb-5 flex items-center gap-2">
-                                <Icon className="w-4 h-4 text-indigo-400" />
-                                <span>{title}</span>
-                            </h3>
+                            <h3 className="section-label mb-5">{title}</h3>
                             {renderBreakdown(items, url.clicks)}
                         </div>
                     ))}
@@ -273,7 +271,7 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs border-collapse">
                             <thead>
-                                <tr className="text-zinc-500 border-b border-white/[0.06]">
+                                <tr className="text-stone-500 border-b border-white/[0.06]">
                                     <th className="py-3 px-3 font-medium">Time</th>
                                     <th className="py-3 px-3 font-medium">Country</th>
                                     <th className="py-3 px-3 font-medium">Device</th>
@@ -281,23 +279,23 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
                                     <th className="py-3 px-3 font-medium">Referrer</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-white/[0.04] text-zinc-300">
+                            <tbody className="divide-y divide-white/[0.04] text-stone-300">
                                 {stats.recentClicks.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="py-8 text-center text-zinc-500">
+                                        <td colSpan={5} className="py-8 text-center text-stone-500">
                                             No clicks tracked yet
                                         </td>
                                     </tr>
                                 ) : (
                                     stats.recentClicks.map((click) => (
                                         <tr key={click.id} className="hover:bg-white/[0.02] transition-colors">
-                                            <td className="py-3 px-3 font-mono text-zinc-400 whitespace-nowrap">
+                                            <td className="py-3 px-3 font-mono text-stone-400 whitespace-nowrap">
                                                 {new Date(click.clickedAt).toLocaleString()}
                                             </td>
-                                            <td className="py-3 px-3 font-medium text-zinc-200">{click.country || 'Unknown'}</td>
-                                            <td className="py-3 px-3 text-zinc-400">{click.device || 'Unknown'}</td>
-                                            <td className="py-3 px-3 text-zinc-400">{click.browser || 'Unknown'}</td>
-                                            <td className="py-3 px-3 truncate max-w-xs text-zinc-400" title={click.referrer || ''}>
+                                            <td className="py-3 px-3 font-medium text-stone-200">{click.country || 'Unknown'}</td>
+                                            <td className="py-3 px-3 text-stone-400">{click.device || 'Unknown'}</td>
+                                            <td className="py-3 px-3 text-stone-400">{click.browser || 'Unknown'}</td>
+                                            <td className="py-3 px-3 truncate max-w-xs text-stone-400" title={click.referrer || ''}>
                                                 {click.referrer || 'Direct'}
                                             </td>
                                         </tr>
