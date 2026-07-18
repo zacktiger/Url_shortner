@@ -1,7 +1,10 @@
+import QRCode from 'qrcode';
 import prisma from '../config/db.js';
 import { generateUniqueShortCode } from '../services/base62Service.js';
 import { getCachedUrl, setCachedUrl } from '../services/redisService.js';
 import { trackClick } from '../services/analyticsService.js';
+
+const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
 
 // POST /url — Create a short URL
 export async function handleGenerateShortUrl(req, res) {
@@ -100,6 +103,38 @@ export async function handleRedirect(req, res) {
         return res.redirect(urlRecord.longUrl);
     } catch (error) {
         console.error('Error in redirect:', error);
+        return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+}
+
+// GET /url/:shortCode/qr — QR code for the short link (PNG by default, ?format=dataurl for a JSON data URL)
+export async function handleGetQrCode(req, res) {
+    const { shortCode } = req.params;
+    const { format } = req.query;
+
+    try {
+        const urlRecord = await prisma.url.findUnique({
+            where: { shortCode },
+            select: { id: true },
+        });
+
+        if (!urlRecord) {
+            return res.status(404).json({ success: false, message: 'Short URL not found' });
+        }
+
+        const shortUrl = `${BASE_URL}/${shortCode}`;
+
+        if (format === 'dataurl') {
+            const dataUrl = await QRCode.toDataURL(shortUrl, { width: 300, margin: 2 });
+            return res.status(200).json({ success: true, shortCode, shortUrl, qrCode: dataUrl });
+        }
+
+        const pngBuffer = await QRCode.toBuffer(shortUrl, { type: 'png', width: 300, margin: 2 });
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return res.status(200).send(pngBuffer);
+    } catch (error) {
+        console.error('Error generating QR code:', error);
         return res.status(500).json({ success: false, message: 'Internal server error' });
     }
 }

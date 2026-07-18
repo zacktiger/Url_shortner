@@ -5,6 +5,7 @@ import urlRoutes from './routes/urlRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import { handleRedirect } from './controllers/urlController.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
@@ -34,6 +35,9 @@ app.use('/auth', authRoutes);
 app.use('/url', urlRoutes);
 app.use('/user', userRoutes);
 app.use('/analytics', analyticsRoutes);
+
+// Root-level redirect — keep last so reserved prefixes above win over short codes
+app.get('/:shortCode', handleRedirect);
 
 app.use(errorHandler);
 

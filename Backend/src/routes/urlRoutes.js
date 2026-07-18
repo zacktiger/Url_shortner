@@ -1,11 +1,11 @@
 import express from 'express';
-import { handleGenerateShortUrl, handleRedirect } from '../controllers/urlController.js';
+import { handleGenerateShortUrl, handleGetQrCode } from '../controllers/urlController.js';
 import { optionalAuth } from '../middleware/auth.js';
 import { urlCreationLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
 router.post('/', urlCreationLimiter, optionalAuth, handleGenerateShortUrl);
-router.get('/:shortCode', handleRedirect);
+router.get('/:shortCode/qr', handleGetQrCode);
 
 export default router;
