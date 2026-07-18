@@ -46,24 +46,6 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        const fetchStats = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                const res = await fetchApi(`/analytics/${shortCode}`);
-                if (res.success) {
-                    setData(res);
-                } else {
-                    setError(res.message || 'Failed to fetch analytics.');
-                }
-            } catch (err: any) {
-                setError(err.message || 'Access denied or server error.');
-            } finally {
-                setData(null); // Clear loading state if error or set data
-                setLoading(false);
-            }
-        };
-
         const executeFetch = async () => {
             try {
                 const res = await fetchApi(`/analytics/${shortCode}`);
@@ -112,7 +94,7 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
 
     const { url, stats } = data;
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-    const shortUrl = `${API_URL}/url/${url.shortCode}`;
+    const shortUrl = `${API_URL}/${url.shortCode}`;
 
     // Helper to get progress bar gradient colors dynamically
     const getProgressBarColor = (label: string, type: 'country' | 'referrer' | 'device' | 'browser') => {

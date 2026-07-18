@@ -23,8 +23,8 @@ export default function UrlCard({ url, onDelete }: UrlCardProps) {
     const [deleting, setDeleting] = useState(false);
 
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-    const shortUrl = `${API_URL}/url/${url.shortCode}`;
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(shortUrl)}&color=0f172a&bgcolor=ffffff`;
+    const shortUrl = `${API_URL}/${url.shortCode}`;
+    const qrCodeUrl = `${API_URL}/url/${url.shortCode}/qr`;
 
     const handleCopy = async () => {
         try {
