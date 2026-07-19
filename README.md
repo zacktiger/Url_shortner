@@ -17,6 +17,7 @@ A high-performance, production-ready URL shortener built with a modern full-stac
 
 - **Base62 Short Codes** — nanoid-powered 7-char codes using `0-9a-zA-Z` alphabet, collision-resistant with up to 5 re-rolls
 - **Custom Aliases** — create memorable short links like `/my-link`
+- **Link Expiration** — optionally set a link to expire (1 / 7 / 30 days); expired links return `410 Gone` and are evicted from the cache
 - **Redis Caching** — cache-aside redirects for sub-millisecond response times; graceful fallback to Postgres if Redis is unavailable
 - **QR Code Generation** — every short URL gets an auto-generated QR code (PNG or data URL)
 - **Click Analytics** — track total clicks, browsers, devices, and referrers per URL
@@ -132,8 +133,8 @@ docker compose up --build
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `POST` | `/url` | Optional | Create short URL |
-| `GET` | `/:shortCode` | — | Redirect to original URL |
+| `POST` | `/url` | Optional | Create short URL (body: `longUrl`, optional `customAlias`, optional `expiresAt` ISO date) |
+| `GET` | `/:shortCode` | — | Redirect to original URL (`410` if the link has expired) |
 | `GET` | `/url/:shortCode/qr` | — | QR code — PNG by default, `?format=dataurl` for a JSON data URL |
 | `GET` | `/analytics/:shortCode` | Optional | Click analytics for one URL (owner-only if the link belongs to a user) |
 | `GET` | `/analytics/dashboard` | Required | Summary stats across the caller's URLs |

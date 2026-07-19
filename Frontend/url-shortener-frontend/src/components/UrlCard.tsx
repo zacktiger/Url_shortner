@@ -10,11 +10,21 @@ interface UrlRecord {
     shortCode: string;
     longUrl: string;
     clicks?: number;
+    expiresAt?: string | null;
 }
 
 interface UrlCardProps {
     url: UrlRecord;
     onDelete?: (shortCode: string) => void;
+}
+
+// Short human date like "Jul 27, 2026" for the expiry badge.
+function formatExpiry(expiresAt: string) {
+    return new Date(expiresAt).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+    });
 }
 
 export default function UrlCard({ url, onDelete }: UrlCardProps) {
@@ -25,6 +35,10 @@ export default function UrlCard({ url, onDelete }: UrlCardProps) {
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
     const shortUrl = `${API_URL}/${url.shortCode}`;
     const qrCodeUrl = `${API_URL}/url/${url.shortCode}/qr`;
+
+    // Whether this link has an expiry, and if so whether it's already passed.
+    const hasExpiry = Boolean(url.expiresAt);
+    const isExpired = hasExpiry && new Date(url.expiresAt as string).getTime() <= Date.now();
 
     const handleCopy = async () => {
         try {
@@ -78,6 +92,17 @@ export default function UrlCard({ url, onDelete }: UrlCardProps) {
                             <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-500/10 text-emerald-400">
                                 {url.clicks} {url.clicks === 1 ? 'click' : 'clicks'}
                             </span>
+                        )}
+                        {hasExpiry && (
+                            isExpired ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-rose-500/10 text-rose-400">
+                                    Expired
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-500/10 text-amber-400">
+                                    Expires {formatExpiry(url.expiresAt as string)}
+                                </span>
+                            )
                         )}
                     </div>
                     <p className="text-xs text-zinc-500 truncate max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl" title={url.longUrl}>

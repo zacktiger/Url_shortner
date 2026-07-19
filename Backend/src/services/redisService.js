@@ -1,7 +1,7 @@
 import redisClient from '../config/redis.js';
 
 const CACHE_PREFIX = 'url:';
-const DEFAULT_TTL = 86400; // 24 hours (in seconds)
+export const DEFAULT_TTL = 86400; // 24 hours (in seconds)
 
 /**
  * Retrieves the cached URL record matching the short code.

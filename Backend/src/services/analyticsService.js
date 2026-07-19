@@ -43,8 +43,9 @@ export function parseUserAgent(userAgent) {
 }
 
 /**
- * Asynchronously record a click and its metadata.
- * @param {number} urlId 
+ * Asynchronously record a click: logs its metadata AND increments the URL's
+ * click counter, atomically (see the transaction below).
+ * @param {number} urlId
  * @param {object} req - Express request object to extract headers
  */
 export async function trackClick(urlId, req) {
@@ -70,16 +71,25 @@ export async function trackClick(urlId, req) {
 
         const { browser, device } = parseUserAgent(userAgent);
 
-        // Create Analytics record
-        await prisma.analytics.create({
-            data: {
-                urlId,
-                country,
-                device,
-                browser,
-                referrer
-            }
-        });
+        // Log the click and bump the URL's click counter in a single
+        // transaction so url.clicks always matches the number of Analytics
+        // rows. If either write fails, both roll back — the counter and the
+        // detailed logs can never drift apart.
+        await prisma.$transaction([
+            prisma.analytics.create({
+                data: {
+                    urlId,
+                    country,
+                    device,
+                    browser,
+                    referrer
+                }
+            }),
+            prisma.url.update({
+                where: { id: urlId },
+                data: { clicks: { increment: 1 } }
+            })
+        ]);
     } catch (error) {
         console.error('Error tracking click analytics:', error);
     }
