@@ -13,6 +13,22 @@ A high-performance, production-ready URL shortener built with a modern full-stac
 | **Auth** | Google OAuth 2.0 + JWT |
 | **Infra** | Docker Compose |
 
+## 🏗️ Architecture
+
+```mermaid
+flowchart LR
+    U([User]) --> FE["Next.js Frontend<br/>(Vercel)"]
+    FE -->|REST + JWT| API["Express API<br/>(Node.js)"]
+
+    API -->|"cache-aside<br/>(read/write short codes)"| R[("Redis<br/>cache")]
+    API -->|"Prisma ORM"| DB[("PostgreSQL<br/>User · Url · Analytics")]
+    API -->|"OAuth 2.0"| G([Google OAuth])
+
+    R -.->|cache miss| DB
+```
+
+**Redirect path:** `GET /:shortCode` → check Redis → on a hit, redirect immediately; on a miss, read Postgres, warm the cache, then redirect. Either way a click is recorded in `Analytics`. Expired links return `410 Gone` and are evicted from the cache. If Redis is down, the API falls back to Postgres and keeps serving.
+
 ## ✨ Features
 
 - **Base62 Short Codes** — nanoid-powered 7-char codes using `0-9a-zA-Z` alphabet, collision-resistant with up to 5 re-rolls
