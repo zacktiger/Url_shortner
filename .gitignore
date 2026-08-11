@@ -54,3 +54,6 @@ docs/target.txt
 
 # Local dev scratch scripts (not part of the app)
 Backend/scratch/
+
+# Playwright MCP session artifacts
+.playwright-mcp/

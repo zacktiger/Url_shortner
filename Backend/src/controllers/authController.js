@@ -1,4 +1,5 @@
 import { generateToken } from '../utils/jwt.js';
+import { FRONTEND_URL } from '../config/urls.js';
 
 /**
  * Handles the redirect after Google OAuth success.
@@ -17,9 +18,8 @@ export function handleGoogleCallback(req, res) {
         };
 
         const token = generateToken(payload);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-        return res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+        return res.redirect(`${FRONTEND_URL}/auth/callback?token=${token}`);
     } catch (error) {
         console.error('Google callback error:', error);
         return res.status(500).json({ success: false, message: 'Internal server error' });

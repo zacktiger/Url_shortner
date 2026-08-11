@@ -8,6 +8,7 @@ import userRoutes from './routes/userRoutes.js';
 import { handleRedirect } from './controllers/urlController.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { FRONTEND_URL } from './config/urls.js';
 
 const app = express();
 
@@ -20,7 +21,7 @@ const trustProxyHops = Number(process.env.TRUST_PROXY ?? (process.env.NODE_ENV =
 app.set('trust proxy', trustProxyHops);
 
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: FRONTEND_URL,
     credentials: true,
 }));
 app.use(express.json());

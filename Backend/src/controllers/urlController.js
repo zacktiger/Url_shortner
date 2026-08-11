@@ -3,8 +3,7 @@ import prisma from '../config/db.js';
 import { generateUniqueShortCode } from '../services/base62Service.js';
 import { getCachedUrl, setCachedUrl, deleteCachedUrl, DEFAULT_TTL } from '../services/redisService.js';
 import { trackClick } from '../services/analyticsService.js';
-
-const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
+import { BASE_URL } from '../config/urls.js';
 
 /**
  * True if a link has an expiry that has already passed.
