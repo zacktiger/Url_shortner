@@ -51,3 +51,6 @@ generated/
 # Project specific
 target.txt
 docs/target.txt
+
+# Local dev scratch scripts (not part of the app)
+Backend/scratch/

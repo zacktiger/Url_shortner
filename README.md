@@ -133,7 +133,7 @@ npm run dev
 ```bash
 # Create root .env from template
 cp .env.example .env
-# Fill in credentials
+# Fill in at least POSTGRES_PASSWORD and JWT_SECRET
 
 docker compose up --build
 ```
@@ -144,6 +144,60 @@ docker compose up --build
 | Backend API | http://localhost:5000 |
 | PostgreSQL | localhost:5435 |
 | Redis | localhost:6379 |
+
+Compose applies any pending Prisma migrations before the API starts, and the
+frontend waits for the backend's `/health` check to pass before booting.
+
+## 🚀 Deploying
+
+### 1. Set the production environment
+
+`NODE_ENV=production` turns on strict startup validation — the API refuses to
+boot if `DATABASE_URL`, `JWT_SECRET`, `BASE_URL` or `FRONTEND_URL` is missing,
+or if `JWT_SECRET` is shorter than 32 characters or still the placeholder. This
+is deliberate: the code carries a development fallback secret, and booting with
+it in production would let anyone forge a login token.
+
+```bash
+# Generate a real secret
+openssl rand -base64 48
+```
+
+### 2. Point the URLs at your real domains
+
+| Variable | Purpose |
+|---|---|
+| `BASE_URL` | Origin used to build returned short links |
+| `FRONTEND_URL` | Allowed CORS origin |
+| `GOOGLE_CALLBACK_URL` | Must match the redirect URI registered in Google Cloud Console |
+| `NEXT_PUBLIC_API_URL` | API origin the browser calls |
+
+`NEXT_PUBLIC_*` values are compiled into the browser bundle at **build time**,
+so `NEXT_PUBLIC_API_URL` is passed to the frontend image as a build arg.
+Changing it requires rebuilding the frontend — setting it only at runtime has
+no effect.
+
+```bash
+docker compose build --build-arg NEXT_PUBLIC_API_URL=https://api.example.com frontend
+```
+
+### 3. Behind a reverse proxy
+
+Set `TRUST_PROXY` to the number of proxies in front of the API (defaults to `1`
+in production). This is what lets rate limiting key on the real client IP
+instead of lumping every visitor into one bucket. Set it to `0` if the API is
+exposed directly.
+
+### 4. Operational notes
+
+- **Health check:** `GET /health` returns status and uptime.
+- **Graceful shutdown:** SIGTERM/SIGINT drain in-flight requests and close the
+  DB and Redis handles before exit, so deploys don't drop live requests.
+- **Migrations:** run `npm run migrate:deploy` from `Backend/` if you deploy
+  outside Compose.
+- **Database port:** Compose binds Postgres and Redis to `127.0.0.1` so they
+  are not publicly reachable on a deployed host.
+- Both containers run as non-root users.
 
 ## 🔌 API Reference
 
