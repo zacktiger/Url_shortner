@@ -188,6 +188,31 @@ in production). This is what lets rate limiting key on the real client IP
 instead of lumping every visitor into one bucket. Set it to `0` if the API is
 exposed directly.
 
+### Hosted deploy: Supabase + Render + Vercel
+
+| Piece | Host | Notes |
+|---|---|---|
+| PostgreSQL | Supabase | Two connection strings — see below |
+| Express API | Render | Blueprint in `render.yaml` |
+| Next.js frontend | Vercel | Root directory `Frontend/url-shortener-frontend` |
+| Redis | *(optional)* | Upstash, or omit — the app falls back to the database |
+
+**Supabase needs two connection strings.** Migrations cannot run through a
+transaction pooler, so `DATABASE_URL` (pooled, port 6543, `?pgbouncer=true`)
+and `DIRECT_URL` (session, port 5432) are separate. Copy both from the Supabase
+dashboard's **Connect** button rather than assembling them by hand.
+
+**Order matters** — each service needs the previous one's URL:
+
+1. Create the Supabase project, copy both connection strings.
+2. Deploy the API on Render (it runs migrations during build).
+3. Deploy the frontend on Vercel with `NEXT_PUBLIC_API_URL` set to the Render URL.
+4. Go back and set `FRONTEND_URL` on Render to the Vercel URL, then redeploy —
+   without this, CORS blocks every browser request.
+
+`BASE_URL` must be the **Render** origin, since short links resolve against the
+API, not the frontend.
+
 ### 4. Operational notes
 
 - **Health check:** `GET /health` returns status and uptime.

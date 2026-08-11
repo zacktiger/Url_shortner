@@ -4,7 +4,16 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+
+  // Pooled connection used by the running app. On Supabase this is the
+  // transaction pooler (port 6543) with ?pgbouncer=true.
+  url = env("DATABASE_URL")
+
+  // Migrations can't run through a transaction pooler — it doesn't support the
+  // prepared statements and advisory locks the migration engine needs. This
+  // points at a direct/session connection instead. For local Postgres it is
+  // simply the same URL as above.
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
