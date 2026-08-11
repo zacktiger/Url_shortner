@@ -57,3 +57,8 @@ Backend/scratch/
 
 # Playwright MCP session artifacts
 .playwright-mcp/
+
+# Vercel CLI local project link and pulled env files (contains secrets)
+.vercel/
+
+.vercel

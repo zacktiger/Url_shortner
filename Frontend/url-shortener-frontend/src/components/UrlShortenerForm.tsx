@@ -102,7 +102,7 @@ export default function UrlShortenerForm({ onSuccess }: UrlShortenerFormProps) {
             <button
                 type="button"
                 onClick={() => setShowAdvanced(!showAdvanced)}
-                className="flex items-center gap-1 text-xs font-medium text-zinc-500 hover:text-indigo-400 transition-colors"
+                className="flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-accent-bright transition-colors"
             >
                 <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-200 ${showAdvanced ? 'rotate-90' : ''}`} />
                 <span>Custom alias &amp; expiry</span>
@@ -112,7 +112,7 @@ export default function UrlShortenerForm({ onSuccess }: UrlShortenerFormProps) {
                 <div className="p-4 bg-black/20 border border-white/[0.06] rounded-xl animate-slideUp space-y-4">
                     <div className="space-y-2.5">
                         <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-zinc-500 text-sm font-mono">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-stone-500 text-sm font-mono">
                                 snaplink.click/
                             </div>
                             <input
@@ -124,13 +124,13 @@ export default function UrlShortenerForm({ onSuccess }: UrlShortenerFormProps) {
                                 disabled={loading}
                             />
                         </div>
-                        <p className="text-[11px] text-zinc-500">
+                        <p className="text-[11px] text-stone-500">
                             Letters, numbers, hyphens (-) and underscores (_). Minimum 3 characters.
                         </p>
                     </div>
 
                     <div className="space-y-1.5">
-                        <label className="block text-[11px] font-medium text-zinc-400">Link expiration</label>
+                        <label className="block text-[11px] font-medium text-stone-400">Link expiration</label>
                         <select
                             value={expiresInDays}
                             onChange={(e) => setExpiresInDays(e.target.value)}

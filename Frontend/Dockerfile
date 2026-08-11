@@ -19,6 +19,10 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Opt in to `output: "standalone"` (see next.config.ts). Only this image needs
+# it, and enabling it globally breaks Vercel's post-build step.
+ENV BUILD_STANDALONE=1
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY url-shortener-frontend ./
 RUN npm run build
