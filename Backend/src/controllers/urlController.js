@@ -1,14 +1,74 @@
 import QRCode from 'qrcode';
 import prisma from '../config/db.js';
 import { generateUniqueShortCode } from '../services/base62Service.js';
-import { getCachedUrl, setCachedUrl } from '../services/redisService.js';
+import { getCachedUrl, setCachedUrl, deleteCachedUrl, DEFAULT_TTL } from '../services/redisService.js';
 import { trackClick } from '../services/analyticsService.js';
+import { BASE_URL } from '../config/urls.js';
 
-const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
+/**
+ * True if a link has an expiry that has already passed.
+ * Links with no expiry (expiresAt == null) never expire.
+ */
+function isExpired(expiresAt) {
+    return expiresAt != null && new Date(expiresAt).getTime() <= Date.now();
+}
+
+/**
+ * Validate the optional `expiresAt` value from a create request.
+ * Returns `{ date }` on success — `date` is null when no expiry was given —
+ * or `{ error }` with a user-facing message when the value is unusable.
+ *
+ * @param {*} expiresAt - Raw value from the request body (ISO string, or empty).
+ * @returns {{ date: Date|null, error?: string }}
+ */
+function parseExpiry(expiresAt) {
+    // Nothing provided — the link never expires.
+    if (expiresAt === undefined || expiresAt === null || expiresAt === '') {
+        return { date: null };
+    }
+
+    const date = new Date(expiresAt);
+    if (isNaN(date.getTime())) {
+        return { error: 'Invalid expiration date' };
+    }
+    if (date.getTime() <= Date.now()) {
+        return { error: 'Expiration date must be in the future' };
+    }
+    return { date };
+}
+
+/**
+ * Cache a short-code → URL mapping for fast redirects.
+ *
+ * We store expiresAt alongside the URL so the redirect can enforce expiry
+ * straight from the cache. If the link expires sooner than the default cache
+ * lifetime, we shrink the Redis TTL to match — that way the cache can never
+ * outlive the link and serve an expired redirect.
+ *
+ * @param {object} record - A Url row (needs shortCode, id, longUrl, expiresAt).
+ */
+async function cacheUrlRecord(record) {
+    const expiresAt = record.expiresAt ? new Date(record.expiresAt) : null;
+
+    const payload = {
+        id: record.id,
+        longUrl: record.longUrl,
+        expiresAt: expiresAt ? expiresAt.toISOString() : null,
+    };
+
+    if (expiresAt) {
+        const secondsUntilExpiry = Math.floor((expiresAt.getTime() - Date.now()) / 1000);
+        // Clamp to [1s, default 24h] so the TTL is never zero/negative or oversized.
+        const ttl = Math.max(1, Math.min(DEFAULT_TTL, secondsUntilExpiry));
+        await setCachedUrl(record.shortCode, payload, ttl);
+    } else {
+        await setCachedUrl(record.shortCode, payload);
+    }
+}
 
 // POST /url — Create a short URL
 export async function handleGenerateShortUrl(req, res) {
-    const { longUrl, customAlias } = req.body;
+    const { longUrl, customAlias, expiresAt } = req.body;
 
     if (!longUrl) {
         return res.status(400).json({ success: false, message: 'URL is required' });
@@ -18,6 +78,12 @@ export async function handleGenerateShortUrl(req, res) {
         new URL(longUrl);
     } catch {
         return res.status(400).json({ success: false, message: 'Invalid URL format (include http:// or https://)' });
+    }
+
+    // Optional expiration — validate before we touch the database.
+    const { date: expiresAtDate, error: expiryError } = parseExpiry(expiresAt);
+    if (expiryError) {
+        return res.status(400).json({ success: false, message: expiryError });
     }
 
     try {
@@ -39,15 +105,16 @@ export async function handleGenerateShortUrl(req, res) {
         const userId = req.user?.id || null;
 
         const urlRecord = await prisma.url.create({
-            data: { 
-                longUrl, 
+            data: {
+                longUrl,
                 shortCode,
-                userId
+                userId,
+                expiresAt: expiresAtDate,
             },
         });
 
         // Cache the mapping for fast redirects
-        await setCachedUrl(shortCode, { id: urlRecord.id, longUrl: urlRecord.longUrl });
+        await cacheUrlRecord(urlRecord);
 
         return res.status(201).json({
             success: true,
@@ -55,6 +122,7 @@ export async function handleGenerateShortUrl(req, res) {
             longUrl: urlRecord.longUrl,
             clicks: urlRecord.clicks,
             createdAt: urlRecord.createdAt,
+            expiresAt: urlRecord.expiresAt,
         });
     } catch (error) {
         console.error('Error generating short URL:', error);
@@ -71,13 +139,16 @@ export async function handleRedirect(req, res) {
         const cachedData = await getCachedUrl(shortCode);
 
         if (cachedData) {
-            // Cache hit — increment clicks & track analytics async, redirect immediately
-            console.log(`[cache] HIT  ${shortCode}`);
-            prisma.url.update({
-                where: { shortCode },
-                data: { clicks: { increment: 1 } },
-            }).catch(console.error);
+            // Expired links must not redirect, even on a cache hit. Drop the
+            // stale entry so we stop serving it before its TTL would lapse.
+            if (isExpired(cachedData.expiresAt)) {
+                await deleteCachedUrl(shortCode);
+                return res.status(410).json({ success: false, message: 'This link has expired' });
+            }
 
+            // Cache hit — record the click (counter + analytics, atomically) and
+            // redirect immediately without waiting on the write.
+            console.log(`[cache] HIT  ${shortCode}`);
             trackClick(cachedData.id, req).catch(console.error);
 
             return res.redirect(cachedData.longUrl);
@@ -91,15 +162,15 @@ export async function handleRedirect(req, res) {
             return res.status(404).json({ success: false, message: 'Short URL not found' });
         }
 
+        // Expired links are gone for good — return 410 and don't cache them.
+        if (isExpired(urlRecord.expiresAt)) {
+            return res.status(410).json({ success: false, message: 'This link has expired' });
+        }
+
         // 3. Populate cache for next time
-        await setCachedUrl(shortCode, { id: urlRecord.id, longUrl: urlRecord.longUrl });
+        await cacheUrlRecord(urlRecord);
 
-        // 4. Increment clicks and track analytics
-        prisma.url.update({
-            where: { shortCode },
-            data: { clicks: { increment: 1 } },
-        }).catch(console.error);
-
+        // 4. Record the click (counter + analytics, atomically)
         trackClick(urlRecord.id, req).catch(console.error);
 
         return res.redirect(urlRecord.longUrl);

@@ -1,0 +1,68 @@
+# Render Blueprint for the Express API.
+#
+# The database lives on Supabase and the frontend on Vercel, so this file
+# defines only the backend web service. Values marked `sync: false` are secrets
+# or environment-specific URLs — Render prompts for them on first deploy and
+# they are never stored in the repo.
+services:
+  - type: web
+    name: url-shortener-api
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: Backend
+
+    # Migrations run here rather than at container start: on Render the build
+    # step runs once per deploy, whereas the start command can run repeatedly
+    # (restarts, scaling), and concurrent `migrate deploy` runs contend for the
+    # same advisory lock.
+    buildCommand: npm ci && npx prisma generate && npx prisma migrate deploy
+    startCommand: npm start
+
+    healthCheckPath: /health
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # Number of proxy hops in front of the app. Render terminates TLS and
+      # forwards one X-Forwarded-For hop, so rate limiting keys on the real
+      # client IP with this set to 1.
+      - key: TRUST_PROXY
+        value: 1
+
+      # Supabase transaction pooler (port 6543), with ?pgbouncer=true
+      - key: DATABASE_URL
+        sync: false
+
+      # Supabase session pooler (port 5432) — used by prisma migrate only
+      - key: DIRECT_URL
+        sync: false
+
+      # Generate with: openssl rand -base64 48
+      - key: JWT_SECRET
+        generateValue: true
+
+      # This service's own public URL, e.g. https://url-shortener-api.onrender.com
+      # Short links are built from it, so it must be the API origin.
+      - key: BASE_URL
+        sync: false
+
+      # The Vercel URL — this is the only allowed CORS origin.
+      - key: FRONTEND_URL
+        sync: false
+
+      # Optional Google sign-in. Leave CLIENT_ID and CLIENT_SECRET unset to
+      # disable it; if you set them, GOOGLE_CALLBACK_URL must match the redirect
+      # URI registered in the Google Cloud console exactly.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CALLBACK_URL
+        sync: false
+
+      # Optional cache (e.g. Upstash). Unset means every redirect hits the
+      # database — correct, just slower.
+      - key: REDIS_URL
+        sync: false

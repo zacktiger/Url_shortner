@@ -13,10 +13,27 @@ A high-performance, production-ready URL shortener built with a modern full-stac
 | **Auth** | Google OAuth 2.0 + JWT |
 | **Infra** | Docker Compose |
 
+## 🏗️ Architecture
+
+```mermaid
+flowchart LR
+    U([User]) --> FE["Next.js Frontend<br/>(Vercel)"]
+    FE -->|REST + JWT| API["Express API<br/>(Node.js)"]
+
+    API -->|"cache-aside<br/>(read/write short codes)"| R[("Redis<br/>cache")]
+    API -->|"Prisma ORM"| DB[("PostgreSQL<br/>User · Url · Analytics")]
+    API -->|"OAuth 2.0"| G([Google OAuth])
+
+    R -.->|cache miss| DB
+```
+
+**Redirect path:** `GET /:shortCode` → check Redis → on a hit, redirect immediately; on a miss, read Postgres, warm the cache, then redirect. Either way a click is recorded in `Analytics`. Expired links return `410 Gone` and are evicted from the cache. If Redis is down, the API falls back to Postgres and keeps serving.
+
 ## ✨ Features
 
 - **Base62 Short Codes** — nanoid-powered 7-char codes using `0-9a-zA-Z` alphabet, collision-resistant with up to 5 re-rolls
 - **Custom Aliases** — create memorable short links like `/my-link`
+- **Link Expiration** — optionally set a link to expire (1 / 7 / 30 days); expired links return `410 Gone` and are evicted from the cache
 - **Redis Caching** — cache-aside redirects for sub-millisecond response times; graceful fallback to Postgres if Redis is unavailable
 - **QR Code Generation** — every short URL gets an auto-generated QR code (PNG or data URL)
 - **Click Analytics** — track total clicks, browsers, devices, and referrers per URL
@@ -116,7 +133,7 @@ npm run dev
 ```bash
 # Create root .env from template
 cp .env.example .env
-# Fill in credentials
+# Fill in at least POSTGRES_PASSWORD and JWT_SECRET
 
 docker compose up --build
 ```
@@ -128,12 +145,91 @@ docker compose up --build
 | PostgreSQL | localhost:5435 |
 | Redis | localhost:6379 |
 
+Compose applies any pending Prisma migrations before the API starts, and the
+frontend waits for the backend's `/health` check to pass before booting.
+
+## 🚀 Deploying
+
+### 1. Set the production environment
+
+`NODE_ENV=production` turns on strict startup validation — the API refuses to
+boot if `DATABASE_URL`, `JWT_SECRET`, `BASE_URL` or `FRONTEND_URL` is missing,
+or if `JWT_SECRET` is shorter than 32 characters or still the placeholder. This
+is deliberate: the code carries a development fallback secret, and booting with
+it in production would let anyone forge a login token.
+
+```bash
+# Generate a real secret
+openssl rand -base64 48
+```
+
+### 2. Point the URLs at your real domains
+
+| Variable | Purpose |
+|---|---|
+| `BASE_URL` | Origin used to build returned short links |
+| `FRONTEND_URL` | Allowed CORS origin |
+| `GOOGLE_CALLBACK_URL` | Must match the redirect URI registered in Google Cloud Console |
+| `NEXT_PUBLIC_API_URL` | API origin the browser calls |
+
+`NEXT_PUBLIC_*` values are compiled into the browser bundle at **build time**,
+so `NEXT_PUBLIC_API_URL` is passed to the frontend image as a build arg.
+Changing it requires rebuilding the frontend — setting it only at runtime has
+no effect.
+
+```bash
+docker compose build --build-arg NEXT_PUBLIC_API_URL=https://api.example.com frontend
+```
+
+### 3. Behind a reverse proxy
+
+Set `TRUST_PROXY` to the number of proxies in front of the API (defaults to `1`
+in production). This is what lets rate limiting key on the real client IP
+instead of lumping every visitor into one bucket. Set it to `0` if the API is
+exposed directly.
+
+### Hosted deploy: Supabase + Render + Vercel
+
+| Piece | Host | Notes |
+|---|---|---|
+| PostgreSQL | Supabase | Two connection strings — see below |
+| Express API | Render | Blueprint in `render.yaml` |
+| Next.js frontend | Vercel | Root directory `Frontend/url-shortener-frontend` |
+| Redis | *(optional)* | Upstash, or omit — the app falls back to the database |
+
+**Supabase needs two connection strings.** Migrations cannot run through a
+transaction pooler, so `DATABASE_URL` (pooled, port 6543, `?pgbouncer=true`)
+and `DIRECT_URL` (session, port 5432) are separate. Copy both from the Supabase
+dashboard's **Connect** button rather than assembling them by hand.
+
+**Order matters** — each service needs the previous one's URL:
+
+1. Create the Supabase project, copy both connection strings.
+2. Deploy the API on Render (it runs migrations during build).
+3. Deploy the frontend on Vercel with `NEXT_PUBLIC_API_URL` set to the Render URL.
+4. Go back and set `FRONTEND_URL` on Render to the Vercel URL, then redeploy —
+   without this, CORS blocks every browser request.
+
+`BASE_URL` must be the **Render** origin, since short links resolve against the
+API, not the frontend.
+
+### 4. Operational notes
+
+- **Health check:** `GET /health` returns status and uptime.
+- **Graceful shutdown:** SIGTERM/SIGINT drain in-flight requests and close the
+  DB and Redis handles before exit, so deploys don't drop live requests.
+- **Migrations:** run `npm run migrate:deploy` from `Backend/` if you deploy
+  outside Compose.
+- **Database port:** Compose binds Postgres and Redis to `127.0.0.1` so they
+  are not publicly reachable on a deployed host.
+- Both containers run as non-root users.
+
 ## 🔌 API Reference
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `POST` | `/url` | Optional | Create short URL |
-| `GET` | `/:shortCode` | — | Redirect to original URL |
+| `POST` | `/url` | Optional | Create short URL (body: `longUrl`, optional `customAlias`, optional `expiresAt` ISO date) |
+| `GET` | `/:shortCode` | — | Redirect to original URL (`410` if the link has expired) |
 | `GET` | `/url/:shortCode/qr` | — | QR code — PNG by default, `?format=dataurl` for a JSON data URL |
 | `GET` | `/analytics/:shortCode` | Optional | Click analytics for one URL (owner-only if the link belongs to a user) |
 | `GET` | `/analytics/dashboard` | Required | Summary stats across the caller's URLs |

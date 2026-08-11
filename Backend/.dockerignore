@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log*
+
+# Never bake local secrets into the image
+.env
+.env.*
+
+# Local-only dev helpers
+scratch/
+
+Dockerfile
+.dockerignore
+.git
+.gitignore
+*.md

@@ -109,6 +109,7 @@ export async function getUrlAnalytics(req, res) {
                 longUrl: urlRecord.longUrl,
                 clicks: urlRecord.clicks,
                 createdAt: urlRecord.createdAt,
+                expiresAt: urlRecord.expiresAt,
             },
             stats: {
                 countries: countries.map((c) => ({ country: c.country || 'Unknown', count: c._count.id })),

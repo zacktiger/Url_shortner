@@ -11,6 +11,8 @@ interface UrlShortenerFormProps {
 export default function UrlShortenerForm({ onSuccess }: UrlShortenerFormProps) {
     const [longUrl, setLongUrl] = useState('');
     const [customAlias, setCustomAlias] = useState('');
+    // '' means "never expires"; otherwise it's a number of days as a string.
+    const [expiresInDays, setExpiresInDays] = useState('');
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -32,13 +34,22 @@ export default function UrlShortenerForm({ onSuccess }: UrlShortenerFormProps) {
             return;
         }
 
+        // Turn the selected number of days into an absolute expiry timestamp.
+        // Empty selection => undefined => the link never expires.
+        let expiresAt: string | undefined;
+        if (expiresInDays) {
+            const days = parseInt(expiresInDays, 10);
+            expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+        }
+
         setLoading(true);
         try {
             const result = await fetchApi('/url', {
                 method: 'POST',
                 body: JSON.stringify({
                     longUrl,
-                    customAlias: customAlias ? customAlias.trim() : undefined
+                    customAlias: customAlias ? customAlias.trim() : undefined,
+                    expiresAt,
                 }),
             });
 
@@ -46,6 +57,7 @@ export default function UrlShortenerForm({ onSuccess }: UrlShortenerFormProps) {
                 onSuccess(result);
                 setLongUrl('');
                 setCustomAlias('');
+                setExpiresInDays('');
             } else {
                 setError(result.message || 'Failed to shorten URL');
             }
@@ -93,27 +105,44 @@ export default function UrlShortenerForm({ onSuccess }: UrlShortenerFormProps) {
                 className="flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-accent-bright transition-colors"
             >
                 <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-200 ${showAdvanced ? 'rotate-90' : ''}`} />
-                <span>Custom alias</span>
+                <span>Custom alias &amp; expiry</span>
             </button>
 
             {showAdvanced && (
-                <div className="p-4 bg-black/20 border border-white/[0.06] rounded-xl animate-slideUp space-y-2.5">
-                    <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-stone-500 text-sm font-mono">
-                            snaplink.click/
+                <div className="p-4 bg-black/20 border border-white/[0.06] rounded-xl animate-slideUp space-y-4">
+                    <div className="space-y-2.5">
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-stone-500 text-sm font-mono">
+                                snaplink.click/
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="my-custom-slug"
+                                value={customAlias}
+                                onChange={(e) => setCustomAlias(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
+                                className="input-field pl-[130px] pr-4 py-2.5 text-sm font-mono"
+                                disabled={loading}
+                            />
                         </div>
-                        <input
-                            type="text"
-                            placeholder="my-custom-slug"
-                            value={customAlias}
-                            onChange={(e) => setCustomAlias(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
-                            className="input-field pl-[130px] pr-4 py-2.5 text-sm font-mono"
-                            disabled={loading}
-                        />
+                        <p className="text-[11px] text-stone-500">
+                            Letters, numbers, hyphens (-) and underscores (_). Minimum 3 characters.
+                        </p>
                     </div>
-                    <p className="text-[11px] text-stone-500">
-                        Letters, numbers, hyphens (-) and underscores (_). Minimum 3 characters.
-                    </p>
+
+                    <div className="space-y-1.5">
+                        <label className="block text-[11px] font-medium text-stone-400">Link expiration</label>
+                        <select
+                            value={expiresInDays}
+                            onChange={(e) => setExpiresInDays(e.target.value)}
+                            className="input-field w-full px-4 py-2.5 text-sm"
+                            disabled={loading}
+                        >
+                            <option value="">Never expires</option>
+                            <option value="1">Expires in 1 day</option>
+                            <option value="7">Expires in 7 days</option>
+                            <option value="30">Expires in 30 days</option>
+                        </select>
+                    </div>
                 </div>
             )}
 

@@ -1,0 +1,17 @@
+**/node_modules
+**/npm-debug.log*
+
+# Build output — always rebuilt inside the image
+**/.next
+**/out
+**/*.tsbuildinfo
+
+# Never bake local secrets into the image
+**/.env
+**/.env.*
+
+Dockerfile
+.dockerignore
+.git
+.gitignore
+**/*.md
