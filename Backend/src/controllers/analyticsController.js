@@ -43,11 +43,11 @@ async function getClicksByDay(urlId, days = 30) {
 
 /**
  * Returns detailed analytics for a specific short URL.
- * Enforces ownership if the URL belongs to a registered user.
+ * Sign-in is required (requireAuth) and only the link's owner may read its stats.
  */
 export async function getUrlAnalytics(req, res) {
     const { shortCode } = req.params;
-    const userId = req.user?.id; // Optional or required, depending on route middleware
+    const userId = req.user.id; // requireAuth guarantees this exists
 
     try {
         const urlRecord = await prisma.url.findUnique({
@@ -64,8 +64,9 @@ export async function getUrlAnalytics(req, res) {
             return res.status(404).json({ success: false, message: 'URL not found' });
         }
 
-        // If URL belongs to a user, block other users from viewing its analytics
-        if (urlRecord.userId !== null && urlRecord.userId !== userId) {
+        // Only the owner sees a link's analytics. Links created before sign-in was
+        // enforced have no owner (userId === null) and so are readable by nobody.
+        if (urlRecord.userId !== userId) {
             return res.status(403).json({ success: false, message: 'Access denied' });
         }
 

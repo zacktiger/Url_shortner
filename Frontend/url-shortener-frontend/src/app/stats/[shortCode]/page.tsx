@@ -79,10 +79,17 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
             }
         };
 
-        if (!authLoading) {
-            executeFetch();
+        if (authLoading) return;
+
+        // Analytics are owner-only, so send signed-out visitors home to sign in
+        // rather than showing them an "Authorization token required" error.
+        if (!user) {
+            router.replace('/');
+            return;
         }
-    }, [shortCode, authLoading]);
+
+        executeFetch();
+    }, [shortCode, authLoading, user, router]);
 
     if (authLoading || loading) {
         return (

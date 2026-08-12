@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import UrlShortenerForm from '@/components/UrlShortenerForm';
 import UrlCard from '@/components/UrlCard';
 import SnapDemo from '@/components/SnapDemo';
-import { ArrowRight } from 'lucide-react';
+import { Loader2, LogIn } from 'lucide-react';
 
 // Three true facts about the system, shown as a spec sheet instead of
 // decorative feature cards. Copy matches the backend implementation.
@@ -25,7 +25,7 @@ const SPECS = [
 ];
 
 export default function Home() {
-    const { user } = useAuth();
+    const { user, loading } = useAuth();
     const [createdUrl, setCreatedUrl] = useState<any>(null);
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -47,30 +47,42 @@ export default function Home() {
                     <SnapDemo />
                 </div>
 
-                {/* Shortener form */}
+                {/* Shortener form — signed-in users only, since every link needs an owner */}
                 <div className="card p-5 sm:p-6 mt-8">
-                    <UrlShortenerForm onSuccess={(record) => setCreatedUrl(record)} />
+                    {loading ? (
+                        // Session check is in flight; don't flash the sign-in gate at a signed-in user.
+                        <div className="flex items-center justify-center gap-2 py-8 text-sm text-stone-500">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Checking your session…</span>
+                        </div>
+                    ) : user ? (
+                        <>
+                            <UrlShortenerForm onSuccess={(record) => setCreatedUrl(record)} />
 
-                    {createdUrl && (
-                        <div className="mt-6 animate-slideUp">
-                            <UrlCard url={createdUrl} />
+                            {createdUrl && (
+                                <div className="mt-6 animate-slideUp">
+                                    <UrlCard url={createdUrl} />
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div className="py-6 text-center space-y-4">
+                            <p className="text-sm text-stone-300">
+                                Sign in with Google to start shortening links.
+                            </p>
+                            <button
+                                onClick={handleGoogleLogin}
+                                className="btn-primary px-5 py-2.5 text-sm"
+                            >
+                                <LogIn className="w-4 h-4" />
+                                <span>Sign in with Google</span>
+                            </button>
+                            <p className="text-xs text-stone-500">
+                                Links are saved to your account, so you keep them, get QR codes, and see who clicked.
+                            </p>
                         </div>
                     )}
                 </div>
-
-                {/* Sign-in prompt as a sentence, not a card */}
-                {!user && (
-                    <p className="mt-5 text-sm text-stone-400">
-                        <button
-                            onClick={handleGoogleLogin}
-                            className="group inline-flex items-center gap-1 text-accent-bright hover:text-white font-medium transition-colors"
-                        >
-                            Sign in with Google
-                            <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-                        </button>
-                        {' '}to keep your links, get QR codes, and see who clicked.
-                    </p>
-                )}
 
                 {/* Spec sheet */}
                 <div className="mt-16 pt-10 border-t border-white/[0.07] grid grid-cols-1 sm:grid-cols-3 gap-8">
