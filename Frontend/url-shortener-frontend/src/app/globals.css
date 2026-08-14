@@ -22,6 +22,19 @@
   /* Cobalt accent: solid for buttons, bright step for text/links on dark */
   --color-accent: #3d6ef7;
   --color-accent-bright: #7fa3ff;
+
+  /* Recessed wells (advanced panel, chart tooltip) sit *below* the surface */
+  --color-surface-2: #201f1e;
+
+  /* The one border weight used everywhere: cards, rails, table rules */
+  --color-hairline: rgba(255, 255, 255, 0.07);
+
+  /* Two steps of quiet text: labels and captions, then the barely-there tier */
+  --color-muted: #8a877f;
+  --color-faint: #57534e;
+
+  /* Corner radius for every card and rail */
+  --radius-card: 12px;
 }
 
 body {
@@ -49,8 +62,8 @@ body::before {
 /* Raised card on the dark canvas: solid surface + hairline border. */
 .card {
   background-color: var(--color-surface);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
 }
 
 /* Cards that are hover targets brighten their border, nothing else. */
@@ -127,7 +140,119 @@ body::before {
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #8a877f;
+  color: var(--color-muted);
+}
+
+/* ---- Share bars ------------------------------------------------------- */
+
+/*
+ * Breakdown lists rank their rows, so the bars have to rank too. The leader
+ * gets a thick solid accent bar; everything below it gets a thin, muted one.
+ * Equal-weight bars were the reason the old stats page read as flat.
+ */
+.bar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+.bar-lead {
+  height: 8px;
+}
+.bar-lead > div {
+  background: var(--color-accent);
+}
+.bar-tail {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.bar-tail > div {
+  background: color-mix(in oklch, var(--color-accent-bright) 55%, transparent);
+}
+/* Both bar kinds animate their width when the numbers land. */
+.bar-track > div {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.5s ease;
+}
+
+/* ---- Dense data table -------------------------------------------------- */
+
+/* The recent-clicks log: mono uppercase headers, tight rows, hairline rules. */
+.table-dense th {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+.table-dense td {
+  padding: 7px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.035);
+}
+
+/* ---- Segmented icon group ---------------------------------------------- */
+
+/*
+ * One bordered shell holding the icon actions, instead of four loose buttons
+ * each carrying its own border. The group owns the frame; the buttons inside
+ * are transparent until hovered.
+ */
+.icon-group {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.icon-group > button,
+.icon-group > a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  color: var(--color-muted);
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.icon-group > button:hover,
+.icon-group > a:hover {
+  color: #fff;
+}
+.icon-group > button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+/* Hairline separators between the cells. */
+.icon-group > * + * {
+  box-shadow: -1px 0 0 rgba(255, 255, 255, 0.08);
+}
+/* The active (toggled-on) cell, e.g. QR panel open. */
+.icon-group .is-active {
+  color: var(--color-accent-bright);
+  background: rgba(61, 110, 247, 0.14);
+}
+/* Delete is the only destructive cell, and only says so on hover. */
+.icon-group .danger:hover {
+  color: #fb7185;
+  background: rgba(244, 63, 94, 0.1);
+}
+
+/* ---- Focus ------------------------------------------------------------- */
+
+/*
+ * One visible focus treatment for every control. Two stacked rings so the
+ * accent stays legible whether the control sits on the canvas or on a card.
+ */
+:where(a, button, input, select):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-canvas), 0 0 0 4px var(--color-accent);
+  border-radius: 8px;
 }
 
 /* ---- Scrollbar -------------------------------------------------------- */
@@ -212,5 +337,9 @@ body::before {
     opacity: 1;
     transform: none;
     filter: none;
+  }
+  /* Share bars snap to their final width instead of growing into it. */
+  .bar-track > div {
+    transition: none;
   }
 }
