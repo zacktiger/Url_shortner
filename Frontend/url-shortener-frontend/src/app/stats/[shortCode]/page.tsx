@@ -333,8 +333,10 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
                 </div>
 
                 {/* Stat rail — the three secondary figures share one card, split
-                    by hairlines, instead of taking a tile each. */}
-                <div className="card grid grid-cols-1 sm:grid-cols-3">
+                    by hairlines, instead of taking a tile each. overflow-hidden
+                    clips those hairlines to the card's rounded corners; without
+                    it they run square into them. */}
+                <div className="card grid grid-cols-1 sm:grid-cols-3 overflow-hidden">
                     {railStats.map(({ label, top, count }, index) => (
                         <div
                             key={label}
@@ -363,13 +365,18 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
                 </div>
 
                 {/* Recent click log */}
-                <div className="card p-4 sm:p-[18px] pb-1.5">
+                {/* Padding is spelled out per side: a `sm:p-[18px]` shorthand would
+                    re-apply 18px to the bottom too, undoing the tight edge the
+                    table's own last-row border already gives us. */}
+                <div className="card p-4 pb-1.5 sm:px-[18px] sm:pt-[18px]">
                     <div className="flex items-baseline justify-between mb-1.5">
                         <h3 className="section-label">Recent clicks</h3>
                         <span className="font-mono text-[10.5px] text-faint">last 10</span>
                     </div>
                     <div className="overflow-x-auto">
-                        <table className="table-dense w-full text-xs border-collapse">
+                        {/* min-w keeps the five columns readable on a phone: the
+                            wrapper scrolls instead of crushing them. */}
+                        <table className="table-dense w-full min-w-[38rem] text-xs border-collapse">
                             <thead>
                                 <tr>
                                     <th>Time</th>
@@ -397,11 +404,18 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
                                             </td>
                                             <td className="text-stone-400">{click.device || 'Unknown'}</td>
                                             <td className="text-stone-400">{click.browser || 'Unknown'}</td>
-                                            <td
-                                                className="font-mono text-[11.5px] text-stone-500 truncate max-w-[220px]"
-                                                title={click.referrer || ''}
-                                            >
-                                                {click.referrer || 'Direct'}
+                                            {/* The clamp lives on an inner span, not the
+                                                cell: a table-cell sizes to its content
+                                                and treats max-width as a suggestion, so
+                                                `truncate` on the <td> never fires and a
+                                                long referrer drags the table off-card. */}
+                                            <td className="font-mono text-[11.5px] text-stone-500">
+                                                <span
+                                                    className="block max-w-[220px] truncate"
+                                                    title={click.referrer || ''}
+                                                >
+                                                    {click.referrer || 'Direct'}
+                                                </span>
                                             </td>
                                         </tr>
                                     ))

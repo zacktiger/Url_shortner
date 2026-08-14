@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import UrlShortenerForm from '@/components/UrlShortenerForm';
 import UrlCard from '@/components/UrlCard';
-import UrlLedger from '@/components/UrlLedger';
+import SnapDemo from '@/components/SnapDemo';
 import { Loader2, LogIn } from 'lucide-react';
 
 // Three true facts about the system, shown as a numbered spec sheet instead of
@@ -46,8 +46,10 @@ export default function Home() {
                     Cut long links <span className="text-accent-bright">down to size.</span>
                 </h1>
 
-                <div className="mt-7">
-                    <UrlLedger />
+                {/* Reserve the height so the hero doesn't jump when the short
+                    link lands on the second line. */}
+                <div className="mt-8 min-h-[3.5rem]">
+                    <SnapDemo />
                 </div>
 
                 {/* Shortener form — signed-in users only, since every link needs an owner */}
