@@ -5,14 +5,8 @@ import { useAuth } from '@/context/AuthContext';
 import { fetchApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2, ArrowUpRight, Calendar } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceDot, ResponsiveContainer } from 'recharts';
 import { useCountUp } from '@/lib/useCountUp';
-
-// Numeric tile values count up on load; text values render as-is.
-function StatValue({ value }: { value: string | number }) {
-    const animated = useCountUp(typeof value === 'number' ? value : 0);
-    return <>{typeof value === 'number' ? animated : value}</>;
-}
 
 interface ClickLog {
     id: number;
@@ -50,6 +44,84 @@ function formatDayLabel(date: string) {
     });
 }
 
+// The headline figure counts up when the page loads.
+function ClickCount({ value }: { value: number }) {
+    const animated = useCountUp(value);
+    return <>{animated.toLocaleString()}</>;
+}
+
+// The busiest day in the window, so the chart can mark it. Null when the link
+// has no clicks at all — there is no peak worth pointing at on a flat line.
+function findPeak(clicksByDay: { date: string; count: number }[]) {
+    let peak: { date: string; count: number } | null = null;
+    for (const day of clicksByDay) {
+        if (day.count > 0 && (!peak || day.count > peak.count)) peak = day;
+    }
+    return peak;
+}
+
+// A ranked breakdown: the leader carries a thick bar and a larger label, the
+// rest share a thin one. Equal-weight bars were why this page read as flat.
+function Breakdown({
+    title,
+    items,
+    total,
+}: {
+    title: string;
+    items: { label: string; count: number }[];
+    total: number;
+}) {
+    const share = (count: number) => (total > 0 ? Math.round((count / total) * 100) : 0);
+    const [leader, ...tail] = items;
+
+    return (
+        <div className="card p-4 sm:p-[18px]">
+            <div className="flex items-baseline justify-between mb-3">
+                <h3 className="section-label">{title}</h3>
+                <span className="font-mono text-[10.5px] text-faint">{items.length} logged</span>
+            </div>
+
+            {items.length === 0 ? (
+                <p className="text-xs text-stone-500 py-6 text-center">No clicks logged yet</p>
+            ) : (
+                <>
+                    {/* Leader */}
+                    <div className="flex flex-col gap-1.5 pb-3 border-b border-white/[0.05]">
+                        <div className="flex items-baseline justify-between gap-3">
+                            <span className="text-[15px] font-semibold text-white truncate">{leader.label}</span>
+                            <span className="flex-none font-mono text-xs font-medium text-accent-bright">
+                                {leader.count} · {share(leader.count)}%
+                            </span>
+                        </div>
+                        <div className="bar-track bar-lead">
+                            <div style={{ width: `${share(leader.count)}%` }} />
+                        </div>
+                    </div>
+
+                    {/* Tail */}
+                    {tail.length > 0 && (
+                        <div className="flex flex-col gap-2.5 mt-3">
+                            {tail.map((item) => (
+                                <div key={item.label} className="flex flex-col gap-1">
+                                    <div className="flex items-baseline justify-between gap-3 text-xs">
+                                        <span className="text-stone-400 truncate">{item.label}</span>
+                                        <span className="flex-none font-mono text-[11px] text-stone-500">
+                                            {item.count} · {share(item.count)}%
+                                        </span>
+                                    </div>
+                                    <div className="bar-track bar-tail">
+                                        <div style={{ width: `${share(item.count)}%` }} />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </>
+            )}
+        </div>
+    );
+}
+
 interface StatsPageProps {
     params: Promise<{ shortCode: string }>;
 }
@@ -79,10 +151,17 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
             }
         };
 
-        if (!authLoading) {
-            executeFetch();
+        if (authLoading) return;
+
+        // Analytics are owner-only, so send signed-out visitors home to sign in
+        // rather than showing them an "Authorization token required" error.
+        if (!user) {
+            router.replace('/');
+            return;
         }
-    }, [shortCode, authLoading]);
+
+        executeFetch();
+    }, [shortCode, authLoading, user, router]);
 
     if (authLoading || loading) {
         return (
@@ -114,42 +193,16 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
     const shortUrl = `${API_URL}/${url.shortCode}`;
 
-    // Reusable stat tile config: label + value (clicks animate via count-up)
-    const statTiles: { label: string; value: string | number }[] = [
-        { label: 'Total clicks', value: url.clicks },
-        { label: 'Top country', value: stats.countries[0]?.country || 'None' },
-        { label: 'Top device', value: stats.devices[0]?.device || 'None' },
-        { label: 'Top browser', value: stats.browsers[0]?.browser || 'None' },
-    ];
+    // The three secondary stats share one rail. Total clicks isn't among them —
+    // it moved inside the chart card, where the trend explains it.
+    const share = (count: number | undefined) =>
+        url.clicks > 0 && count ? `${Math.round((count / url.clicks) * 100)}%` : null;
 
-    // Breakdown lists all share one visual language: a single accent bar whose
-    // width encodes share-of-clicks; the row label carries identity.
-    const renderBreakdown = (items: { label: string; count: number }[], total: number) => {
-        if (items.length === 0) {
-            return <p className="text-xs text-stone-500 py-6 text-center">No clicks logged yet</p>;
-        }
-        return (
-            <div className="space-y-3.5">
-                {items.map((item, index) => {
-                    const percentage = total > 0 ? Math.round((item.count / total) * 100) : 0;
-                    return (
-                        <div key={index} className="space-y-1.5">
-                            <div className="flex justify-between items-baseline text-xs">
-                                <span className="font-medium text-stone-300">{item.label}</span>
-                                <span className="text-stone-500 font-mono text-[11px]">{item.count} · {percentage}%</span>
-                            </div>
-                            <div className="w-full bg-white/[0.05] h-1.5 rounded-full overflow-hidden">
-                                <div
-                                    className="bg-accent-bright h-full rounded-full transition-all duration-500"
-                                    style={{ width: `${percentage}%` }}
-                                />
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        );
-    };
+    const railStats = [
+        { label: 'Top country', top: stats.countries[0]?.country, count: stats.countries[0]?.count },
+        { label: 'Top device', top: stats.devices[0]?.device, count: stats.devices[0]?.count },
+        { label: 'Top browser', top: stats.browsers[0]?.browser, count: stats.browsers[0]?.count },
+    ];
 
     const breakdownSections = [
         { title: 'Countries', items: stats.countries.map(c => ({ label: c.country, count: c.count })) },
@@ -158,57 +211,70 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
         { title: 'Browsers', items: stats.browsers.map(b => ({ label: b.browser, count: b.count })) },
     ];
 
+    const peak = findPeak(stats.clicksByDay);
+
     return (
         <div className="flex-1 px-4 py-10 sm:px-6 lg:px-8">
-            <div className="max-w-5xl mx-auto space-y-6 stagger">
-                {/* Back navigation */}
-                <button
-                    onClick={() => router.push(user ? '/dashboard' : '/')}
-                    className="inline-flex items-center gap-1.5 text-stone-500 hover:text-white transition-colors text-sm font-medium"
-                >
-                    <ArrowLeft className="w-4 h-4" />
-                    <span>Back</span>
-                </button>
-
-                {/* Link header */}
-                <div className="card p-5 sm:p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div className="space-y-1.5 min-w-0">
-                        <h1 className="font-mono text-lg sm:text-xl font-medium text-white break-all">
-                            {shortUrl}
+            <div className="max-w-5xl mx-auto space-y-4 stagger">
+                {/* Link header — a hairline instead of a card, so the chart below
+                    is the first boxed thing on the page. */}
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-3.5 border-b border-hairline">
+                    <div className="min-w-0 flex flex-col gap-1.5">
+                        <button
+                            onClick={() => router.push(user ? '/dashboard' : '/')}
+                            className="inline-flex items-center gap-1.5 self-start font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-stone-500 hover:text-white transition-colors"
+                        >
+                            <ArrowLeft className="w-3 h-3" />
+                            <span>Dashboard</span>
+                        </button>
+                        <h1 className="font-mono text-xl sm:text-[22px] leading-tight font-medium text-white break-all">
+                            {API_URL}/<span className="text-accent-bright">{url.shortCode}</span>
                         </h1>
                         <a
                             href={url.longUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-stone-400 hover:text-accent-bright transition-colors flex items-center gap-1"
+                            className="text-xs text-stone-500 hover:text-accent-bright transition-colors flex items-center gap-1 max-w-[620px]"
                         >
-                            <span className="truncate max-w-xs sm:max-w-md md:max-w-lg lg:max-w-xl">{url.longUrl}</span>
+                            <span className="truncate">{url.longUrl}</span>
                             <ArrowUpRight className="w-3.5 h-3.5 flex-shrink-0" />
                         </a>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0 text-stone-400 text-xs bg-white/[0.03] border border-white/[0.07] px-3 py-1.5 rounded-lg">
-                        <Calendar className="w-3.5 h-3.5" />
-                        <span>Created {new Date(url.createdAt).toLocaleDateString()}</span>
+                    <div className="flex items-center gap-1.5 flex-shrink-0 self-start md:self-auto font-mono text-[11px] text-stone-400 bg-white/[0.03] border border-hairline px-2.5 py-1.5 rounded-md">
+                        <Calendar className="w-3 h-3" />
+                        <span>
+                            Created{' '}
+                            {new Date(url.createdAt).toLocaleDateString(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                            })}
+                        </span>
                     </div>
                 </div>
 
-                {/* Stat tiles */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    {statTiles.map(({ label, value }) => (
-                        <div key={label} className="card p-5 min-w-0">
-                            <span className="section-label">{label}</span>
-                            <p className="text-2xl font-bold text-white font-mono tabular-nums truncate mt-1.5">
-                                <StatValue value={value} />
-                            </p>
+                {/* Clicks over time — the trend owns the top of the page, with the
+                    all-time total living inside it rather than in a tile of its own. */}
+                <div className="card p-4 sm:p-5">
+                    <div className="flex items-start justify-between gap-6 mb-1.5">
+                        <div>
+                            <span className="section-label">Total clicks</span>
+                            <div className="flex items-baseline gap-2.5 flex-wrap mt-0.5">
+                                <span className="font-mono text-[40px] sm:text-[44px] leading-none font-bold tabular-nums text-white">
+                                    <ClickCount value={url.clicks} />
+                                </span>
+                                <span className="font-mono text-[11px] text-stone-500">
+                                    all time · 30-day trend below
+                                </span>
+                            </div>
                         </div>
-                    ))}
-                </div>
-
-                {/* Clicks over time — 30-day trend from stats.clicksByDay */}
-                <div className="card p-5 sm:p-6">
-                    <h3 className="section-label mb-5">Clicks — last 30 days</h3>
-                    <ResponsiveContainer width="100%" height={260}>
-                        <AreaChart data={stats.clicksByDay} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+                        <span className="flex-none font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-accent-bright bg-accent/[0.12] border border-accent/30 px-2.5 py-1 rounded-md">
+                            Last 30 days
+                        </span>
+                    </div>
+                    <ResponsiveContainer width="100%" height={200}>
+                        {/* left margin stays at 0: a negative one clips two-digit y labels */}
+                        <AreaChart data={stats.clicksByDay} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                             {/* Cobalt fill that fades to transparent under the line */}
                             <defs>
                                 <linearGradient id="clicksGradient" x1="0" y1="0" x2="0" y2="1">
@@ -230,7 +296,7 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
                                 tick={{ fill: '#8a877f', fontSize: 10, fontFamily: 'var(--font-mono)' }}
                                 tickLine={false}
                                 axisLine={false}
-                                width={28}
+                                width={34}
                             />
                             <Tooltip
                                 cursor={{ stroke: 'rgba(107,147,255,0.3)' }}
@@ -251,51 +317,90 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
                                 strokeWidth={2}
                                 fill="url(#clicksGradient)"
                             />
+                            {/* Mark the busiest day, so the shape has an anchor */}
+                            {peak && (
+                                <ReferenceDot
+                                    x={peak.date}
+                                    y={peak.count}
+                                    r={3.5}
+                                    fill="#121110"
+                                    stroke="#7fa3ff"
+                                    strokeWidth={2}
+                                />
+                            )}
                         </AreaChart>
                     </ResponsiveContainer>
                 </div>
 
-                {/* Breakdowns: countries / referrers / devices / browsers */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {breakdownSections.map(({ title, items }) => (
-                        <div key={title} className="card p-5 sm:p-6">
-                            <h3 className="section-label mb-5">{title}</h3>
-                            {renderBreakdown(items, url.clicks)}
+                {/* Stat rail — the three secondary figures share one card, split
+                    by hairlines, instead of taking a tile each. */}
+                <div className="card grid grid-cols-1 sm:grid-cols-3">
+                    {railStats.map(({ label, top, count }, index) => (
+                        <div
+                            key={label}
+                            className={`px-5 py-3.5 min-w-0 ${
+                                index > 0 ? 'border-t sm:border-t-0 sm:border-l border-hairline' : ''
+                            }`}
+                        >
+                            <span className="section-label">{label}</span>
+                            <div className="flex items-baseline gap-2 mt-1">
+                                <span className="font-mono text-xl font-semibold text-white truncate">
+                                    {top || 'None'}
+                                </span>
+                                {share(count) && (
+                                    <span className="font-mono text-[11px] text-accent-bright">{share(count)}</span>
+                                )}
+                            </div>
                         </div>
                     ))}
                 </div>
 
+                {/* Breakdowns: countries / referrers / devices / browsers */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    {breakdownSections.map(({ title, items }) => (
+                        <Breakdown key={title} title={title} items={items} total={url.clicks} />
+                    ))}
+                </div>
+
                 {/* Recent click log */}
-                <div className="card p-5 sm:p-6">
-                    <h3 className="section-label mb-5">Recent clicks</h3>
+                <div className="card p-4 sm:p-[18px] pb-1.5">
+                    <div className="flex items-baseline justify-between mb-1.5">
+                        <h3 className="section-label">Recent clicks</h3>
+                        <span className="font-mono text-[10.5px] text-faint">last 10</span>
+                    </div>
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs border-collapse">
+                        <table className="table-dense w-full text-xs border-collapse">
                             <thead>
-                                <tr className="text-stone-500 border-b border-white/[0.06]">
-                                    <th className="py-3 px-3 font-medium">Time</th>
-                                    <th className="py-3 px-3 font-medium">Country</th>
-                                    <th className="py-3 px-3 font-medium">Device</th>
-                                    <th className="py-3 px-3 font-medium">Browser</th>
-                                    <th className="py-3 px-3 font-medium">Referrer</th>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Country</th>
+                                    <th>Device</th>
+                                    <th>Browser</th>
+                                    <th>Referrer</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-white/[0.04] text-stone-300">
+                            <tbody>
                                 {stats.recentClicks.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="py-8 text-center text-stone-500">
+                                        <td colSpan={5} className="py-7 text-center text-stone-500">
                                             No clicks tracked yet
                                         </td>
                                     </tr>
                                 ) : (
                                     stats.recentClicks.map((click) => (
                                         <tr key={click.id} className="hover:bg-white/[0.02] transition-colors">
-                                            <td className="py-3 px-3 font-mono text-stone-400 whitespace-nowrap">
+                                            <td className="font-mono text-[11.5px] text-stone-500 whitespace-nowrap">
                                                 {new Date(click.clickedAt).toLocaleString()}
                                             </td>
-                                            <td className="py-3 px-3 font-medium text-stone-200">{click.country || 'Unknown'}</td>
-                                            <td className="py-3 px-3 text-stone-400">{click.device || 'Unknown'}</td>
-                                            <td className="py-3 px-3 text-stone-400">{click.browser || 'Unknown'}</td>
-                                            <td className="py-3 px-3 truncate max-w-xs text-stone-400" title={click.referrer || ''}>
+                                            <td className="font-mono text-[11.5px] font-medium text-stone-200">
+                                                {click.country || 'Unknown'}
+                                            </td>
+                                            <td className="text-stone-400">{click.device || 'Unknown'}</td>
+                                            <td className="text-stone-400">{click.browser || 'Unknown'}</td>
+                                            <td
+                                                className="font-mono text-[11.5px] text-stone-500 truncate max-w-[220px]"
+                                                title={click.referrer || ''}
+                                            >
                                                 {click.referrer || 'Direct'}
                                             </td>
                                         </tr>

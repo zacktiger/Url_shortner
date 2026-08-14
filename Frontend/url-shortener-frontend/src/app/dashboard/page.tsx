@@ -9,13 +9,18 @@ import UrlCard from '@/components/UrlCard';
 import { Link2, Loader2, RefreshCw, Search } from 'lucide-react';
 import { useCountUp } from '@/lib/useCountUp';
 
-// Stat tile with a number that counts up when the dashboard loads.
-function StatTile({ label, value }: { label: string; value: number }) {
+// A summary figure folded into the page header. These used to be full-width
+// tiles, which pushed the actual links below the fold.
+function HeaderStat({ label, value }: { label: string; value: number }) {
     const animated = useCountUp(value);
     return (
-        <div className="card p-5">
-            <span className="section-label">{label}</span>
-            <p className="text-3xl font-bold text-white font-mono tabular-nums mt-1.5">{animated}</p>
+        <div className="text-left sm:text-right">
+            <span className="font-mono text-[10.5px] font-medium uppercase tracking-[0.1em] text-muted">
+                {label}
+            </span>
+            <p className="text-[26px] leading-none font-bold text-white font-mono tabular-nums mt-1">
+                {animated.toLocaleString()}
+            </p>
         </div>
     );
 }
@@ -26,6 +31,9 @@ interface UrlRecord {
     longUrl: string;
     clicks: number;
     createdAt: string;
+    expiresAt?: string | null;
+    // Daily click counts for the last 30 days, oldest first — powers the sparkline.
+    series?: number[];
 }
 
 interface DashboardStats {
@@ -100,51 +108,60 @@ export default function Dashboard() {
 
     return (
         <div className="flex-1 px-4 py-10 sm:px-6 lg:px-8">
-            <div className="max-w-5xl mx-auto space-y-8 stagger">
-                {/* Header */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="max-w-5xl mx-auto space-y-4 stagger">
+                {/* Header — the two summary figures live here rather than in
+                    tiles of their own, so the links start near the top. */}
+                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-hairline">
                     <div>
-                        <h1 className="font-display text-3xl font-bold text-white tracking-tight">Dashboard</h1>
-                        <p className="text-sm text-stone-400 mt-1">Manage your links and track their performance</p>
+                        <h1 className="font-display text-[28px] font-bold text-white tracking-tight">Dashboard</h1>
+                        <p className="text-[13px] text-stone-400 mt-1">Manage your links and track their performance</p>
                     </div>
-                    <button
-                        onClick={loadDashboardData}
-                        disabled={loading}
-                        className="btn-secondary px-3.5 py-2 text-xs"
-                    >
-                        <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                        <span>Refresh</span>
-                    </button>
+                    <div className="flex items-end gap-5 sm:gap-6">
+                        {stats && (
+                            <>
+                                <HeaderStat label="Active links" value={stats.totalUrls} />
+                                <div className="hidden sm:block w-px h-[34px] bg-white/[0.08]" />
+                                <HeaderStat label="Total clicks" value={stats.totalClicks} />
+                            </>
+                        )}
+                        <button
+                            onClick={loadDashboardData}
+                            disabled={loading}
+                            className="btn-secondary px-3 py-2 text-xs mb-0.5"
+                        >
+                            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                            <span>Refresh</span>
+                        </button>
+                    </div>
                 </div>
 
-                {/* Stat tiles */}
-                {stats && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <StatTile label="Active links" value={stats.totalUrls} />
-                        <StatTile label="Total clicks" value={stats.totalClicks} />
-                    </div>
-                )}
-
                 {/* New link form */}
-                <div className="card p-5 sm:p-6">
-                    <h3 className="section-label mb-4">Shorten a new URL</h3>
+                <div className="card p-4 sm:p-5">
+                    <h3 className="section-label mb-3">Shorten a new URL</h3>
                     <UrlShortenerForm onSuccess={handleNewUrl} />
                 </div>
 
                 {/* Links list */}
-                <div className="space-y-4">
+                <div className="space-y-3">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                        <h3 className="text-base font-semibold text-white">Your links</h3>
+                        <div className="flex items-baseline gap-2.5">
+                            <h3 className="text-[15px] font-semibold text-white">Your links</h3>
+                            {stats && stats.urls.length > 0 && (
+                                <span className="font-mono text-[11px] text-faint">
+                                    {stats.urls.length} · newest first
+                                </span>
+                            )}
+                        </div>
 
                         {stats && stats.urls.length > 0 && (
-                            <div className="relative w-full sm:w-72">
+                            <div className="relative w-full sm:w-[280px]">
                                 <Search className="w-4 h-4 text-stone-500 absolute left-3 top-1/2 -translate-y-1/2" />
                                 <input
                                     type="text"
                                     placeholder="Search by code or destination…"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="input-field pl-9 pr-4 py-2 text-sm"
+                                    className="input-field pl-9 pr-4 py-1.5 text-[13px]"
                                 />
                             </div>
                         )}
@@ -157,12 +174,14 @@ export default function Dashboard() {
                     )}
 
                     {!loading && stats?.urls.length === 0 && (
-                        <div className="card p-12 text-center">
-                            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.04] text-stone-500 mx-auto mb-4">
-                                <Link2 className="w-6 h-6" />
+                        <div className="card p-8 sm:p-[34px] flex items-center gap-4">
+                            <div className="flex-none flex items-center justify-center w-11 h-11 rounded-[11px] bg-white/[0.04] text-stone-500">
+                                <Link2 className="w-[22px] h-[22px]" />
                             </div>
-                            <h4 className="text-sm font-semibold text-stone-300">No links yet</h4>
-                            <p className="text-sm text-stone-500 mt-1">Shorten your first link above to start tracking clicks.</p>
+                            <div>
+                                <h4 className="text-sm font-semibold text-stone-200">No links yet</h4>
+                                <p className="text-[13px] text-stone-500 mt-0.5">Shorten your first link above to start tracking clicks.</p>
+                            </div>
                         </div>
                     )}
 
@@ -181,10 +200,22 @@ export default function Dashboard() {
                                 );
                             }
 
+                            // One card holding hairline-separated rows, rather than
+                            // a stack of separate cards.
                             return (
-                                <div className="space-y-3">
+                                <div className="card overflow-hidden">
                                     {filtered.map((url) => (
-                                        <UrlCard key={url.id} url={url} onDelete={handleDelete} />
+                                        <UrlCard
+                                            key={url.id}
+                                            url={url}
+                                            onDelete={handleDelete}
+                                            variant="row"
+                                            sharePercent={
+                                                stats.totalClicks > 0
+                                                    ? Math.round((url.clicks / stats.totalClicks) * 100)
+                                                    : 0
+                                            }
+                                        />
                                     ))}
                                 </div>
                             );

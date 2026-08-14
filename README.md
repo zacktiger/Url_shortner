@@ -37,7 +37,7 @@ flowchart LR
 - **Redis Caching** — cache-aside redirects for sub-millisecond response times; graceful fallback to Postgres if Redis is unavailable
 - **QR Code Generation** — every short URL gets an auto-generated QR code (PNG or data URL)
 - **Click Analytics** — track total clicks, browsers, devices, and referrers per URL
-- **Google OAuth + JWT** — one-click sign-in, JWT token valid for 7 days, used on all protected routes
+- **Google OAuth + JWT** — sign-in is required to create links, so every URL has an owner; JWT valid for 7 days
 - **Rate Limiting** — 20 URL creates/hour per IP, plus a global 200 requests/15min cap
 - **Dashboard** — manage all your links, view stats, delete URLs
 
@@ -228,10 +228,10 @@ API, not the frontend.
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `POST` | `/url` | Optional | Create short URL (body: `longUrl`, optional `customAlias`, optional `expiresAt` ISO date) |
+| `POST` | `/url` | Required | Create short URL (body: `longUrl`, optional `customAlias`, optional `expiresAt` ISO date) |
 | `GET` | `/:shortCode` | — | Redirect to original URL (`410` if the link has expired) |
 | `GET` | `/url/:shortCode/qr` | — | QR code — PNG by default, `?format=dataurl` for a JSON data URL |
-| `GET` | `/analytics/:shortCode` | Optional | Click analytics for one URL (owner-only if the link belongs to a user) |
+| `GET` | `/analytics/:shortCode` | Required | Click analytics for one URL (owner-only) |
 | `GET` | `/analytics/dashboard` | Required | Summary stats across the caller's URLs |
 | `GET` | `/auth/google` | — | Start OAuth flow |
 | `GET` | `/auth/google/callback` | — | OAuth callback |

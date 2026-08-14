@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Copy, Check, ExternalLink, QrCode, BarChart3, Trash2 } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
+import { sparkPath, SPARK_WIDTH, SPARK_HEIGHT } from '@/lib/spark';
 
 interface UrlRecord {
     id?: number;
@@ -11,11 +12,21 @@ interface UrlRecord {
     longUrl: string;
     clicks?: number;
     expiresAt?: string | null;
+    // Daily click counts for the last 30 days, oldest first. Dashboard only.
+    series?: number[];
 }
 
 interface UrlCardProps {
     url: UrlRecord;
     onDelete?: (shortCode: string) => void;
+    /**
+     * 'card' stands alone (the freshly-created link on the home page).
+     * 'row' sits flush inside the dashboard's list card, and gains the
+     * performance column and sparkline.
+     */
+    variant?: 'card' | 'row';
+    /** Share of the account's total clicks, 0-100. Row variant only. */
+    sharePercent?: number;
 }
 
 // Short human date like "Jul 27, 2026" for the expiry badge.
@@ -27,7 +38,7 @@ function formatExpiry(expiresAt: string) {
     });
 }
 
-export default function UrlCard({ url, onDelete }: UrlCardProps) {
+export default function UrlCard({ url, onDelete, variant = 'card', sharePercent = 0 }: UrlCardProps) {
     const [copied, setCopied] = useState(false);
     const [showQr, setShowQr] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -36,9 +47,13 @@ export default function UrlCard({ url, onDelete }: UrlCardProps) {
     const shortUrl = `${API_URL}/${url.shortCode}`;
     const qrCodeUrl = `${API_URL}/url/${url.shortCode}/qr`;
 
+    const isRow = variant === 'row';
+
     // Whether this link has an expiry, and if so whether it's already passed.
     const hasExpiry = Boolean(url.expiresAt);
     const isExpired = hasExpiry && new Date(url.expiresAt as string).getTime() <= Date.now();
+
+    const trend = isRow ? sparkPath(url.series) : null;
 
     const handleCopy = async () => {
         try {
@@ -71,54 +86,111 @@ export default function UrlCard({ url, onDelete }: UrlCardProps) {
         }
     };
 
-    // Small icon-only action button used for QR / stats / delete
-    const iconBtn = "flex items-center justify-center w-9 h-9 rounded-lg border border-white/[0.08] bg-white/[0.03] text-stone-400 hover:text-white hover:bg-white/[0.07] transition-colors";
+    // The row variant is a flush strip inside the dashboard's list card; the
+    // card variant carries its own surface and border.
+    const shell = isRow
+        ? 'px-4 sm:px-[18px] py-3.5 border-t border-white/[0.05] first:border-t-0 transition-colors hover:bg-white/[0.015]'
+        : 'card card-hover p-4';
 
     return (
-        <div className="card card-hover p-5">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div className="flex-1 min-w-0 space-y-1.5">
-                    <div className="flex items-center gap-3 flex-wrap">
+        <div className={shell}>
+            <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
+                {/* Identity: short link, status badges, destination */}
+                <div className="flex-1 min-w-0 flex flex-col gap-1">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <a
                             href={shortUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="font-mono text-sm sm:text-base font-medium text-accent-bright hover:text-white transition-colors flex items-center gap-1.5 break-all"
+                            className="font-mono text-sm sm:text-[14.5px] font-medium text-accent-bright hover:text-white transition-colors flex items-center gap-1.5 break-all"
                         >
                             {shortUrl}
-                            <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+                            <ExternalLink className="w-3 h-3 flex-shrink-0" />
                         </a>
-                        {typeof url.clicks === 'number' && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-500/10 text-emerald-400">
-                                {url.clicks} {url.clicks === 1 ? 'click' : 'clicks'}
+
+                        {/* In the row variant the click count lives in the
+                            performance column instead, so it isn't repeated here. */}
+                        {!isRow && typeof url.clicks === 'number' && (
+                            <span className="inline-flex items-center px-[7px] py-0.5 rounded-md font-mono text-[11px] font-medium bg-emerald-500/10 text-emerald-400">
+                                {url.clicks}
                             </span>
                         )}
+
                         {hasExpiry && (
                             isExpired ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-rose-500/10 text-rose-400">
+                                <span className="inline-flex items-center px-[7px] py-0.5 rounded-md font-mono text-[10.5px] font-medium bg-rose-500/10 text-rose-400">
                                     Expired
                                 </span>
                             ) : (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-500/10 text-amber-400">
+                                <span className="inline-flex items-center px-[7px] py-0.5 rounded-md font-mono text-[10.5px] font-medium bg-amber-500/10 text-amber-400">
                                     Expires {formatExpiry(url.expiresAt as string)}
                                 </span>
                             )
                         )}
                     </div>
-                    <p className="text-xs text-stone-500 truncate max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl" title={url.longUrl}>
+                    <p className="text-[11.5px] text-stone-500 truncate max-w-sm md:max-w-md lg:max-w-[420px]" title={url.longUrl}>
                         {url.longUrl}
                     </p>
                 </div>
 
-                <div className="flex items-center gap-2 w-full md:w-auto">
+                {/* Performance: how this link is doing relative to the account.
+                    Hidden on small screens, where the row stacks. */}
+                {isRow && (
+                    <div className="hidden md:block flex-none w-[190px]">
+                        <div className="flex items-baseline justify-between gap-2">
+                            <span className="font-mono text-[13px] font-semibold text-emerald-400">
+                                {url.clicks ?? 0}
+                            </span>
+                            <span className="font-mono text-[10.5px] text-faint">
+                                {sharePercent}% of clicks
+                            </span>
+                        </div>
+                        <div className="bar-track h-[3px] mt-1.5 bg-white/[0.05]">
+                            <div
+                                className="bg-emerald-400/75"
+                                // Give any link with clicks a visible sliver, so "1 click"
+                                // doesn't render as an empty track.
+                                style={{ width: `${Math.max(sharePercent, (url.clicks ?? 0) > 0 ? 2 : 0)}%` }}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* 30-day shape. Widest breakpoint only — it's the first thing
+                    worth dropping when space runs out. */}
+                {isRow && trend && (
+                    <svg
+                        width={SPARK_WIDTH}
+                        height={SPARK_HEIGHT}
+                        viewBox={`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`}
+                        className="hidden lg:block flex-none"
+                        aria-hidden="true"
+                    >
+                        <path
+                            d={trend}
+                            fill="none"
+                            stroke="#6b93ff"
+                            strokeWidth={1.5}
+                            strokeLinejoin="round"
+                            strokeLinecap="round"
+                        />
+                    </svg>
+                )}
+
+                {/* Actions: labelled copy, then the segmented icon group */}
+                <div className="flex-none flex items-center gap-1.5">
                     <button
                         onClick={handleCopy}
-                        className="btn-secondary flex-1 md:flex-initial px-4 h-9 text-xs"
+                        className={
+                            copied
+                                ? 'inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium bg-emerald-500/10 border border-emerald-500/[0.28] text-emerald-400'
+                                : 'btn-secondary h-8 px-3 text-xs'
+                        }
                     >
                         {copied ? (
                             <>
-                                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                <span className="text-emerald-400">Copied</span>
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Copied</span>
                             </>
                         ) : (
                             <>
@@ -128,49 +200,63 @@ export default function UrlCard({ url, onDelete }: UrlCardProps) {
                         )}
                     </button>
 
-                    <button
-                        onClick={() => setShowQr(!showQr)}
-                        className={showQr ? `${iconBtn} !border-accent/50 !text-accent-bright !bg-accent/10` : iconBtn}
-                        title="Show QR Code"
-                    >
-                        <QrCode className="w-4 h-4" />
-                    </button>
-
-                    <Link
-                        href={`/stats/${url.shortCode}`}
-                        className={iconBtn}
-                        title="View Analytics"
-                    >
-                        <BarChart3 className="w-4 h-4" />
-                    </Link>
-
-                    {onDelete && (
+                    <div className="icon-group">
                         <button
-                            onClick={handleDelete}
-                            disabled={deleting}
-                            className={`${iconBtn} hover:!text-rose-400 hover:!bg-rose-500/10 hover:!border-rose-500/20`}
-                            title="Delete Link"
+                            onClick={() => setShowQr(!showQr)}
+                            className={showQr ? 'is-active' : undefined}
+                            title="Show QR code"
+                            aria-label="Show QR code"
+                            aria-pressed={showQr}
                         >
-                            <Trash2 className="w-4 h-4" />
+                            <QrCode className="w-[15px] h-[15px]" />
                         </button>
-                    )}
+
+                        <Link
+                            href={`/stats/${url.shortCode}`}
+                            title="View analytics"
+                            aria-label="View analytics"
+                        >
+                            <BarChart3 className="w-[15px] h-[15px]" />
+                        </Link>
+
+                        {onDelete && (
+                            <button
+                                onClick={handleDelete}
+                                disabled={deleting}
+                                className="danger"
+                                title="Delete link"
+                                aria-label="Delete link"
+                            >
+                                <Trash2 className="w-[15px] h-[15px]" />
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
 
-            {/* Collapsible QR code */}
+            {/* Collapsible QR code: white plate keeps the code scannable on the dark canvas */}
             {showQr && (
-                <div className="mt-5 pt-5 border-t border-white/[0.06] flex flex-col items-center animate-fadeIn">
-                    <div className="p-3 bg-white rounded-xl mb-2.5">
+                <div className="mt-3.5 pt-3.5 border-t border-white/[0.06] flex flex-col sm:flex-row sm:items-center gap-4 animate-fadeIn">
+                    <div className="flex-none p-2.5 bg-white rounded-[10px] self-start">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                             src={qrCodeUrl}
-                            alt="QR Code"
+                            alt={`QR code for ${shortUrl}`}
                             width={150}
                             height={150}
                             className="block"
                         />
                     </div>
-                    <span className="text-xs text-stone-500">Scan to open the short link</span>
+                    <div>
+                        <p className="text-[13px] font-medium text-stone-200">Scan to open the short link</p>
+                        <p className="text-xs leading-relaxed text-stone-500 mt-1.5 max-w-[280px]">
+                            Served by the API at{' '}
+                            <span className="font-mono text-[11.5px] text-stone-400">
+                                /url/{url.shortCode}/qr
+                            </span>
+                            . The white plate keeps the code scannable on the dark canvas.
+                        </p>
+                    </div>
                 </div>
             )}
         </div>

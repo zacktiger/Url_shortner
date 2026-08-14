@@ -4,28 +4,31 @@ import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import UrlShortenerForm from '@/components/UrlShortenerForm';
 import UrlCard from '@/components/UrlCard';
-import SnapDemo from '@/components/SnapDemo';
-import { ArrowRight } from 'lucide-react';
+import UrlLedger from '@/components/UrlLedger';
+import { Loader2, LogIn } from 'lucide-react';
 
-// Three true facts about the system, shown as a spec sheet instead of
+// Three true facts about the system, shown as a numbered spec sheet instead of
 // decorative feature cards. Copy matches the backend implementation.
 const SPECS = [
     {
+        num: '01',
         label: 'Redirect',
         text: 'Redis cache-aside lookups serve hot links from memory, keeping the database quiet.',
     },
     {
+        num: '02',
         label: 'Short codes',
         text: '7-character random base62 IDs, collision-checked, with optional custom aliases.',
     },
     {
+        num: '03',
         label: 'Analytics',
         text: 'Country, device, browser and referrer per click, plus a 30-day trend for every link.',
     },
 ];
 
 export default function Home() {
-    const { user } = useAuth();
+    const { user, loading } = useAuth();
     const [createdUrl, setCreatedUrl] = useState<any>(null);
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -43,41 +46,61 @@ export default function Home() {
                     Cut long links <span className="text-accent-bright">down to size.</span>
                 </h1>
 
-                <div className="mt-8 min-h-[3.5rem]">
-                    <SnapDemo />
+                <div className="mt-7">
+                    <UrlLedger />
                 </div>
 
-                {/* Shortener form */}
-                <div className="card p-5 sm:p-6 mt-8">
-                    <UrlShortenerForm onSuccess={(record) => setCreatedUrl(record)} />
+                {/* Shortener form — signed-in users only, since every link needs an owner */}
+                <div className="mt-5">
+                    {loading ? (
+                        // Session check is in flight; don't flash the sign-in gate at a signed-in user.
+                        <div className="card p-5 flex items-center gap-2.5 text-sm text-stone-500">
+                            <Loader2 className="w-4 h-4 text-accent-bright animate-spin" />
+                            <span>Checking your session…</span>
+                        </div>
+                    ) : user ? (
+                        <div className="card p-5">
+                            <UrlShortenerForm onSuccess={(record) => setCreatedUrl(record)} />
 
-                    {createdUrl && (
-                        <div className="mt-6 animate-slideUp">
-                            <UrlCard url={createdUrl} />
+                            {createdUrl && (
+                                <div className="mt-6 animate-slideUp">
+                                    <UrlCard url={createdUrl} />
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        // Signed-out gate: the form needs an owner for the link, so we
+                        // ask for the account up front rather than failing on submit.
+                        <div className="card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                            <div className="min-w-0">
+                                <h2 className="text-[17px] font-semibold text-white">
+                                    Sign in with Google to start shortening links.
+                                </h2>
+                                <p className="text-[13px] leading-relaxed text-stone-400 mt-2 max-w-md">
+                                    Links are owned by your account — you get the QR code and every
+                                    click&apos;s country, device, browser and referrer.
+                                </p>
+                            </div>
+                            <button
+                                onClick={handleGoogleLogin}
+                                className="btn-primary shrink-0 px-5 py-3 text-sm self-start sm:self-auto"
+                            >
+                                <LogIn className="w-4 h-4" />
+                                <span>Sign in with Google</span>
+                            </button>
                         </div>
                     )}
                 </div>
 
-                {/* Sign-in prompt as a sentence, not a card */}
-                {!user && (
-                    <p className="mt-5 text-sm text-stone-400">
-                        <button
-                            onClick={handleGoogleLogin}
-                            className="group inline-flex items-center gap-1 text-accent-bright hover:text-white font-medium transition-colors"
-                        >
-                            Sign in with Google
-                            <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-                        </button>
-                        {' '}to keep your links, get QR codes, and see who clicked.
-                    </p>
-                )}
-
                 {/* Spec sheet */}
-                <div className="mt-16 pt-10 border-t border-white/[0.07] grid grid-cols-1 sm:grid-cols-3 gap-8">
-                    {SPECS.map(({ label, text }) => (
+                <div className="mt-16 pt-10 border-t border-hairline grid grid-cols-1 sm:grid-cols-3 gap-8">
+                    {SPECS.map(({ num, label, text }) => (
                         <div key={label}>
-                            <span className="section-label">{label}</span>
-                            <p className="text-sm text-stone-400 leading-relaxed mt-2.5">{text}</p>
+                            <div className="flex items-baseline gap-2">
+                                <span className="font-mono text-[10.5px] font-medium text-accent">{num}</span>
+                                <span className="section-label">{label}</span>
+                            </div>
+                            <p className="text-sm text-stone-400 leading-relaxed mt-2">{text}</p>
                         </div>
                     ))}
                 </div>

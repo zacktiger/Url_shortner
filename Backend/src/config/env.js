@@ -16,11 +16,15 @@ const REQUIRED_IN_PRODUCTION = [
     'FRONTEND_URL',
 ];
 
-// Google sign-in is optional. Presence of the credentials is what decides
-// whether it is enabled — GOOGLE_CALLBACK_URL is deliberately excluded here
-// because deployment configs commonly give it a default value, which would
-// otherwise make an intentionally-disabled OAuth setup look half-configured.
-const GOOGLE_CREDENTIAL_VARS = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'];
+// Google sign-in is mandatory: creating a link requires an authenticated user,
+// so without working OAuth credentials nobody can shorten anything. Booting
+// with the dummy fallbacks in passport.js would leave a live-looking but
+// unusable deployment, so these are required alongside the vars above.
+const GOOGLE_CREDENTIAL_VARS = [
+    'GOOGLE_CLIENT_ID',
+    'GOOGLE_CLIENT_SECRET',
+    'GOOGLE_CALLBACK_URL',
+];
 
 const MIN_JWT_SECRET_LENGTH = 32;
 
@@ -47,14 +51,11 @@ export function validateEnv() {
         problems.push('JWT_SECRET is still the placeholder value from .env.example.');
     }
 
-    const googleSet = GOOGLE_CREDENTIAL_VARS.filter((key) => process.env[key]);
-    if (googleSet.length === 1) {
-        const missing = GOOGLE_CREDENTIAL_VARS.filter((key) => !process.env[key]);
-        problems.push(`Google OAuth is partially configured — missing: ${missing.join(', ')}.`);
-    }
-    // Credentials present but nowhere for Google to redirect back to.
-    if (googleSet.length === GOOGLE_CREDENTIAL_VARS.length && !process.env.GOOGLE_CALLBACK_URL) {
-        problems.push('GOOGLE_CALLBACK_URL is required when Google OAuth credentials are set.');
+    const missingGoogle = GOOGLE_CREDENTIAL_VARS.filter((key) => !process.env[key]);
+    if (missingGoogle.length > 0) {
+        problems.push(
+            `Google OAuth is required to sign in and create links — missing: ${missingGoogle.join(', ')}.`
+        );
     }
 
     if (problems.length > 0) {

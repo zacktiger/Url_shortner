@@ -1,53 +1,91 @@
 import prisma from '../config/db.js';
+import { Prisma } from '@prisma/client';
 
 /**
- * Builds a daily click count series for the last `days` days for one URL.
+ * Lists every calendar day in the last `days` days as 'YYYY-MM-DD', oldest first.
+ * This is the spine we gap-fill against, so a link with no clicks still gets a
+ * full-length series instead of an empty one.
  *
- * We use a raw SQL query here because Prisma's groupBy can only group by an
- * exact timestamp, not by calendar day. Postgres' TO_CHAR truncates each
- * click's timestamp down to a 'YYYY-MM-DD' string so all clicks on the same
- * day fall into one bucket.
+ * @param {number} days - How many days back to include.
+ * @returns {string[]} e.g. ['2026-07-15', '2026-07-16', …]
+ */
+function listDayKeys(days) {
+    const keys = [];
+    for (let daysAgo = days - 1; daysAgo >= 0; daysAgo--) {
+        const day = new Date();
+        day.setUTCDate(day.getUTCDate() - daysAgo);
+        keys.push(day.toISOString().slice(0, 10));
+    }
+    return keys;
+}
+
+/**
+ * Builds a daily click count series for the last `days` days, for many URLs at
+ * once. One query covers the whole dashboard — counting per link separately
+ * would mean an extra round trip for every link the user owns.
+ *
+ * We use raw SQL because Prisma's groupBy can only group by an exact timestamp,
+ * not by calendar day. Postgres' TO_CHAR truncates each click's timestamp to a
+ * 'YYYY-MM-DD' string so all clicks on the same day fall into one bucket.
  *
  * The DB only returns days that actually had clicks, so we then "gap-fill":
- * we walk every day in the window and default missing days to 0. This gives
- * the frontend a continuous series (no holes) that charts cleanly.
+ * we walk every day in the window and default missing days to 0. This gives the
+ * frontend a continuous series (no holes) that charts cleanly.
+ *
+ * @param {number[]} urlIds - The URLs whose clicks we're counting.
+ * @param {number} days     - How many days back to include (default 30).
+ * @returns {Promise<Map<number, { date: string, count: number }[]>>} Keyed by
+ *          urlId; every value is `days` entries long, oldest day first.
+ */
+async function getClicksByDayForUrls(urlIds, days = 30) {
+    const byUrlId = new Map();
+    // Prisma.join throws on an empty list, and there is nothing to count anyway.
+    if (urlIds.length === 0) return byUrlId;
+
+    // One row per (url, day) that had at least one click.
+    const rowsWithClicks = await prisma.$queryRaw`
+        SELECT "urlId", TO_CHAR("clickedAt", 'YYYY-MM-DD') AS date, COUNT(*)::int AS count
+        FROM "Analytics"
+        WHERE "urlId" IN (${Prisma.join(urlIds)})
+          AND "clickedAt" >= NOW() - (${days} || ' days')::interval
+        GROUP BY 1, 2
+    `;
+
+    // Nest the flat rows into urlId -> { day -> count } so gap-filling is a lookup.
+    const countByUrlAndDate = new Map();
+    for (const row of rowsWithClicks) {
+        if (!countByUrlAndDate.has(row.urlId)) countByUrlAndDate.set(row.urlId, new Map());
+        countByUrlAndDate.get(row.urlId).set(row.date, row.count);
+    }
+
+    const dayKeys = listDayKeys(days);
+    for (const urlId of urlIds) {
+        const counts = countByUrlAndDate.get(urlId) ?? new Map();
+        byUrlId.set(urlId, dayKeys.map((date) => ({ date, count: counts.get(date) || 0 })));
+    }
+    return byUrlId;
+}
+
+/**
+ * Single-URL convenience wrapper, so the day-window and gap-fill logic lives in
+ * exactly one place.
  *
  * @param {number} urlId - The URL whose clicks we're counting.
  * @param {number} days  - How many days back to include (default 30).
  * @returns {Promise<{ date: string, count: number }[]>} Oldest day first.
  */
 async function getClicksByDay(urlId, days = 30) {
-    // One row per day that had at least one click, e.g. { date: '2026-07-18', count: 5 }
-    const rowsWithClicks = await prisma.$queryRaw`
-        SELECT TO_CHAR("clickedAt", 'YYYY-MM-DD') AS date, COUNT(*)::int AS count
-        FROM "Analytics"
-        WHERE "urlId" = ${urlId}
-          AND "clickedAt" >= NOW() - (${days} || ' days')::interval
-        GROUP BY 1
-        ORDER BY 1
-    `;
-
-    // Look up counts by day so gap-filling is a quick Map lookup.
-    const countByDate = new Map(rowsWithClicks.map((row) => [row.date, row.count]));
-
-    // Produce one entry for every day in the window, oldest to newest.
-    const series = [];
-    for (let daysAgo = days - 1; daysAgo >= 0; daysAgo--) {
-        const day = new Date();
-        day.setUTCDate(day.getUTCDate() - daysAgo);
-        const dateKey = day.toISOString().slice(0, 10); // 'YYYY-MM-DD'
-        series.push({ date: dateKey, count: countByDate.get(dateKey) || 0 });
-    }
-    return series;
+    const byUrlId = await getClicksByDayForUrls([urlId], days);
+    return byUrlId.get(urlId);
 }
 
 /**
  * Returns detailed analytics for a specific short URL.
- * Enforces ownership if the URL belongs to a registered user.
+ * Sign-in is required (requireAuth) and only the link's owner may read its stats.
  */
 export async function getUrlAnalytics(req, res) {
     const { shortCode } = req.params;
-    const userId = req.user?.id; // Optional or required, depending on route middleware
+    const userId = req.user.id; // requireAuth guarantees this exists
 
     try {
         const urlRecord = await prisma.url.findUnique({
@@ -64,8 +102,9 @@ export async function getUrlAnalytics(req, res) {
             return res.status(404).json({ success: false, message: 'URL not found' });
         }
 
-        // If URL belongs to a user, block other users from viewing its analytics
-        if (urlRecord.userId !== null && urlRecord.userId !== userId) {
+        // Only the owner sees a link's analytics. Links created before sign-in was
+        // enforced have no owner (userId === null) and so are readable by nobody.
+        if (urlRecord.userId !== userId) {
             return res.status(403).json({ success: false, message: 'Access denied' });
         }
 
@@ -144,12 +183,19 @@ export async function getUserDashboardStats(req, res) {
 
         const totalClicks = urls.reduce((sum, url) => sum + url.clicks, 0);
 
+        // One query for every link's 30-day trend, so each dashboard row can
+        // carry a sparkline. Counts only — the sparkline plots shape, not dates.
+        const seriesByUrlId = await getClicksByDayForUrls(urls.map((url) => url.id), 30);
+
         return res.status(200).json({
             success: true,
             dashboard: {
                 totalUrls: urls.length,
                 totalClicks,
-                urls,
+                urls: urls.map((url) => ({
+                    ...url,
+                    series: (seriesByUrlId.get(url.id) ?? []).map((day) => day.count),
+                })),
             },
         });
     } catch (error) {
