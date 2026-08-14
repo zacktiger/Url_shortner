@@ -1,3 +1,14 @@
+/*
+ * Landing spot for the redirect coming back from the API after Google sign-in.
+ *
+ * The page is split in two on purpose. The real work needs useSearchParams to
+ * read ?token=..., and a Client Component that calls useSearchParams must sit
+ * inside a <Suspense> boundary — during a production build a static page
+ * without one fails to build, because the search params aren't known until the
+ * request reaches the browser. So this outer page stays a Server Component
+ * that renders the boundary, and AuthCallbackClient does the reading.
+ */
+
 import { Suspense } from 'react';
 import AuthCallbackClient from './AuthCallbackClient';
 

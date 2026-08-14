@@ -4,6 +4,12 @@ import React, { useState } from 'react';
 import { fetchApi } from '@/lib/api';
 import { Loader2, ArrowRight, ChevronRight } from 'lucide-react';
 
+/*
+ * The create-a-link form — the write half of the app. Used in two places (the
+ * landing page and the dashboard), which is why the parent decides what
+ * happens after a successful create instead of this component navigating:
+ * the landing page shows the new link inline, the dashboard refetches its list.
+ */
 interface UrlShortenerFormProps {
     onSuccess: (urlRecord: any) => void;
 }
@@ -26,7 +32,11 @@ export default function UrlShortenerForm({ onSuccess }: UrlShortenerFormProps) {
             return;
         }
 
-        // Quick client side validation
+        // Client-side validation is for fast feedback only — the backend
+        // validates again, because anything can POST to the API directly.
+        // Using the browser's own URL parser instead of a regex means
+        // "google.com" (no scheme) is correctly rejected: the redirect needs
+        // an absolute URL or it would resolve relative to our own domain.
         try {
             new URL(longUrl);
         } catch {
@@ -36,14 +46,22 @@ export default function UrlShortenerForm({ onSuccess }: UrlShortenerFormProps) {
 
         // Turn the selected number of days into an absolute expiry timestamp.
         // Empty selection => undefined => the link never expires.
+        // Sent as ISO/UTC so the stored instant doesn't depend on the user's
+        // timezone; the API stores it and returns 410 Gone once it passes.
         let expiresAt: string | undefined;
         if (expiresInDays) {
             const days = parseInt(expiresInDays, 10);
             expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
         }
 
+        // `loading` both disables the inputs and drives the spinner, which is
+        // what stops a double-click creating two links.
         setLoading(true);
         try {
+            // No user id in the body: the backend takes the owner from the JWT
+            // that fetchApi attaches, so a client can't create links for
+            // someone else. Optional fields are sent as undefined, which
+            // JSON.stringify drops from the payload entirely.
             const result = await fetchApi('/url', {
                 method: 'POST',
                 body: JSON.stringify({
@@ -55,6 +73,8 @@ export default function UrlShortenerForm({ onSuccess }: UrlShortenerFormProps) {
 
             if (result.success) {
                 onSuccess(result);
+                // Clear the form so the next link starts from a clean slate —
+                // in particular the alias, which can only be used once.
                 setLongUrl('');
                 setCustomAlias('');
                 setExpiresInDays('');
@@ -62,8 +82,11 @@ export default function UrlShortenerForm({ onSuccess }: UrlShortenerFormProps) {
                 setError(result.message || 'Failed to shorten URL');
             }
         } catch (err: any) {
+            // fetchApi throws on any non-2xx, so this catches the real cases:
+            // a taken alias, the 20-per-hour rate limit, an expired session.
             setError(err.message || 'An error occurred. Please try again.');
         } finally {
+            // `finally` so the form unlocks on failure too, not just success.
             setLoading(false);
         }
     };
@@ -119,6 +142,11 @@ export default function UrlShortenerForm({ onSuccess }: UrlShortenerFormProps) {
                                 type="text"
                                 placeholder="my-custom-slug"
                                 value={customAlias}
+                                // Strip anything that isn't URL-safe as the user
+                                // types, so an illegal alias can't be submitted
+                                // in the first place. A controlled input makes
+                                // this possible: React re-renders with the
+                                // cleaned value rather than the raw keystroke.
                                 onChange={(e) => setCustomAlias(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
                                 className="input-field pl-[130px] pr-4 py-2.5 text-sm font-mono"
                                 disabled={loading}

@@ -6,6 +6,17 @@ import { Copy, Check, ExternalLink, QrCode, BarChart3, Trash2 } from 'lucide-rea
 import { fetchApi } from '@/lib/api';
 import { sparkPath, SPARK_WIDTH, SPARK_HEIGHT } from '@/lib/spark';
 
+/*
+ * One shortened link, rendered two ways.
+ *
+ * This is where the frontend meets the two backend endpoints that aren't
+ * fetched with JavaScript: the short link itself (a plain <a> that the browser
+ * follows to the API, which does the Redis lookup and the 302) and the QR
+ * image (a plain <img> pointing at the API's QR route).
+ *
+ * Fields are optional because the same component renders a record from
+ * POST /url (fresh, no clicks yet) and one from the dashboard list.
+ */
 interface UrlRecord {
     id?: number;
     shortCode: string;
@@ -43,6 +54,9 @@ export default function UrlCard({ url, onDelete, variant = 'card', sharePercent 
     const [showQr, setShowQr] = useState(false);
     const [deleting, setDeleting] = useState(false);
 
+    // Short links are built from the API origin, not the frontend's — the
+    // redirect is handled by Express (GET /:shortCode), so pointing them at
+    // Vercel would 404. This is the same value BASE_URL holds on the backend.
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
     const shortUrl = `${API_URL}/${url.shortCode}`;
     const qrCodeUrl = `${API_URL}/url/${url.shortCode}/qr`;
@@ -50,11 +64,16 @@ export default function UrlCard({ url, onDelete, variant = 'card', sharePercent 
     const isRow = variant === 'row';
 
     // Whether this link has an expiry, and if so whether it's already passed.
+    // Judged in the browser purely to pick a badge; the API is the real
+    // authority and returns 410 Gone regardless of what this says.
     const hasExpiry = Boolean(url.expiresAt);
     const isExpired = hasExpiry && new Date(url.expiresAt as string).getTime() <= Date.now();
 
     const trend = isRow ? sparkPath(url.series) : null;
 
+    // Clipboard write is async and can be refused (denied permission, or a
+    // non-secure origin), hence the try/catch. The 2s timeout flips the button
+    // back from "Copied" on its own — a tiny bit of state that acts as feedback.
     const handleCopy = async () => {
         try {
             await navigator.clipboard.writeText(shortUrl);
@@ -66,6 +85,7 @@ export default function UrlCard({ url, onDelete, variant = 'card', sharePercent 
     };
 
     const handleDelete = async () => {
+        // Deleting cascades to the link's analytics rows, so it's irreversible.
         if (!confirm('Are you sure you want to delete this link? This will delete all click analytics associated with it.')) {
             return;
         }
@@ -75,6 +95,10 @@ export default function UrlCard({ url, onDelete, variant = 'card', sharePercent 
             const res = await fetchApi(`/user/urls/${url.shortCode}`, {
                 method: 'DELETE',
             });
+            // Only tell the parent to drop the row once the server confirms, so
+            // the list can't disappear a link that's actually still there. The
+            // backend also re-checks ownership — this UI hides the button for
+            // links you don't own, but hiding a button isn't a permission check.
             if (res.success && onDelete) {
                 onDelete(url.shortCode);
             }
@@ -98,6 +122,11 @@ export default function UrlCard({ url, onDelete, variant = 'card', sharePercent 
                 {/* Identity: short link, status badges, destination */}
                 <div className="flex-1 min-w-0 flex flex-col gap-1">
                     <div className="flex items-center gap-2 flex-wrap">
+                        {/* A real anchor, not a router link: following it hands
+                            the browser to the API, which looks the code up
+                            (Redis first, Postgres on a miss), records the click,
+                            and 302s to the destination. rel="noopener" stops
+                            the opened page from touching window.opener. */}
                         <a
                             href={shortUrl}
                             target="_blank"
@@ -238,6 +267,12 @@ export default function UrlCard({ url, onDelete, variant = 'card', sharePercent 
             {showQr && (
                 <div className="mt-3.5 pt-3.5 border-t border-white/[0.06] flex flex-col sm:flex-row sm:items-center gap-4 animate-fadeIn">
                     <div className="flex-none p-2.5 bg-white rounded-[10px] self-start">
+                        {/* A plain <img>, not next/image: the QR is generated
+                            per short code by the API, so there's nothing for
+                            Next's optimizer to pre-process. It's also why the
+                            QR route is public — an <img> can't send the
+                            Authorization header, and the code only encodes the
+                            already-public short link. */}
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                             src={qrCodeUrl}

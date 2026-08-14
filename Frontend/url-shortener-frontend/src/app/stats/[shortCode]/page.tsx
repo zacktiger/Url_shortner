@@ -122,11 +122,24 @@ function Breakdown({
     );
 }
 
+// Dynamic route: the folder name [shortCode] makes this one page serve
+// /stats/aB3x9K1, /stats/my-alias and so on, with the segment handed in as a
+// param. In current Next it arrives as a Promise rather than a plain object.
 interface StatsPageProps {
     params: Promise<{ shortCode: string }>;
 }
 
+/*
+ * Per-link analytics: the read-heavy page of the app.
+ *
+ * Everything on it comes from one authenticated call to GET /analytics/:code,
+ * which the backend answers with SQL aggregates (grouped counts per country,
+ * device, browser, referrer) plus a zero-filled 30-day series — grouping in
+ * the database rather than shipping every click row to the browser and
+ * counting here.
+ */
 export default function UrlStatsPage({ params }: StatsPageProps) {
+    // React's use() unwraps the params Promise inside a Client Component.
     const { shortCode } = use(params);
     const { user, loading: authLoading } = useAuth();
     const router = useRouter();
@@ -151,6 +164,8 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
             }
         };
 
+        // Wait for the session check before deciding anything — same reason as
+        // the dashboard: `user` is null for a moment on every hard refresh.
         if (authLoading) return;
 
         // Analytics are owner-only, so send signed-out visitors home to sign in

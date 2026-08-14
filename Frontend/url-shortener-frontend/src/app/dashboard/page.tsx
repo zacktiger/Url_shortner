@@ -42,6 +42,18 @@ interface DashboardStats {
     urls: UrlRecord[];
 }
 
+/*
+ * The signed-in home: every link you own, plus the totals across them.
+ *
+ * One request feeds the whole page. GET /analytics/dashboard returns the
+ * totals, the links, and each link's 30-day series together, so the list can
+ * render counts and sparklines without an extra call per row (an N+1 problem
+ * that would get slower with every link added).
+ *
+ * Note this is a Client Component, so the data is fetched in the browser after
+ * the shell paints — that's the trade-off for keeping the JWT in localStorage,
+ * which a server render can't read.
+ */
 export default function Dashboard() {
     const { user, loading: authLoading } = useAuth();
     const router = useRouter();
@@ -67,6 +79,15 @@ export default function Dashboard() {
         }
     };
 
+    /*
+     * Route guard. Waiting on authLoading is the important part: on a fresh
+     * page load `user` is briefly null while the token is being verified, so
+     * redirecting immediately would bounce a legitimately signed-in user off
+     * their own dashboard on every refresh.
+     *
+     * This is a UX guard, not security — the data is protected by the API,
+     * which rejects the request without a valid JWT no matter what the UI does.
+     */
     useEffect(() => {
         if (!authLoading) {
             if (!user) {
@@ -77,22 +98,36 @@ export default function Dashboard() {
         }
     }, [user, authLoading, router]);
 
+    // After a create we refetch rather than splicing the new link in: the
+    // response doesn't carry the derived fields the list needs (series,
+    // recomputed totals), so a round trip is the simpler correct option.
     const handleNewUrl = (newRecord: any) => {
         loadDashboardData();
     };
 
+    /*
+     * Delete goes the other way — the row is removed from local state instead
+     * of refetching, so the list updates instantly. The card only calls this
+     * after the API confirms the delete, and the totals are adjusted by hand to
+     * match: subtract one link and that link's clicks, so the header figures
+     * stay consistent with the list without a second request.
+     */
     const handleDelete = (shortCode: string) => {
         if (stats) {
             const deletedUrl = stats.urls.find(u => u.shortCode === shortCode);
             const clicksToDeduct = deletedUrl ? deletedUrl.clicks : 0;
             setStats({
                 totalUrls: stats.totalUrls - 1,
+                // Clamped at 0 so a stale count can never render a negative total.
                 totalClicks: Math.max(0, stats.totalClicks - clicksToDeduct),
                 urls: stats.urls.filter(url => url.shortCode !== shortCode)
             });
         }
     };
 
+    // Spinner only while there's nothing to show. `!stats` is what keeps a
+    // manual Refresh from blanking the page you're already looking at — the
+    // existing list stays put and only the button spins.
     if (authLoading || (user && loading && !stats)) {
         return (
             <div className="flex-1 flex flex-col items-center justify-center gap-3">
@@ -102,6 +137,8 @@ export default function Dashboard() {
         );
     }
 
+    // The effect above is already redirecting; render nothing for the frame or
+    // two before it lands, rather than flashing an empty dashboard.
     if (!user) {
         return null;
     }
@@ -187,6 +224,10 @@ export default function Dashboard() {
 
                     {!loading && stats && stats.urls.length > 0 && (
                         (() => {
+                            // Filtering happens in the browser over the list we
+                            // already hold — no request per keystroke. Fine at
+                            // personal scale; a user with thousands of links
+                            // would want server-side search and pagination.
                             const filtered = stats.urls.filter(url =>
                                 url.shortCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                 url.longUrl.toLowerCase().includes(searchQuery.toLowerCase())
@@ -206,6 +247,11 @@ export default function Dashboard() {
                                 <div className="card overflow-hidden">
                                     {filtered.map((url) => (
                                         <UrlCard
+                                            // Keyed by database id, not array
+                                            // index, so React keeps each row's
+                                            // own state (open QR panel, "Copied"
+                                            // flag) attached to the right link
+                                            // when the list is filtered.
                                             key={url.id}
                                             url={url}
                                             onDelete={handleDelete}

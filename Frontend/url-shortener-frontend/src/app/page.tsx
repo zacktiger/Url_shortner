@@ -27,8 +27,18 @@ const SPECS = [
     },
 ];
 
+/*
+ * Landing page, and the shortest path through the app: sign in, paste a link,
+ * get a short one back — without leaving this page.
+ *
+ * It renders one of three states depending on the session: still checking,
+ * signed in (the form), or signed out (the gate). Holding the freshly created
+ * link in local state rather than redirecting is deliberate — the user sees
+ * the result, the QR toggle and the copy button immediately.
+ */
 export default function Home() {
     const { user, loading } = useAuth();
+    // Only the most recent create — the dashboard is where the full list lives.
     const [createdUrl, setCreatedUrl] = useState<any>(null);
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 

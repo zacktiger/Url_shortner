@@ -5,10 +5,22 @@ import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { Link2, LogOut, LayoutDashboard, LogIn } from 'lucide-react';
 
+/*
+ * Sits in the root layout, so it renders on every page and re-renders whenever
+ * the session changes — signing in or out swaps these buttons with no manual
+ * refresh, because both sides read the same AuthContext.
+ */
 export default function Navbar() {
     const { user, logout } = useAuth();
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
+    /*
+     * Deliberately a full browser navigation, not router.push(). OAuth is a
+     * redirect chain across three origins (this app → the API → Google → back),
+     * so the browser has to actually leave the page. Next's client router only
+     * navigates within this app, and fetch() would be blocked by CORS and
+     * couldn't render Google's consent screen anyway.
+     */
     const handleGoogleLogin = () => {
         window.location.href = `${API_URL}/auth/google`;
     };

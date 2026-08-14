@@ -1,3 +1,17 @@
+/*
+ * The shell every page renders inside — the only place <html> and <body> are
+ * written, so anything here is truly global.
+ *
+ * It has no "use client" directive, so it's a Server Component: the markup is
+ * generated on the server and no JavaScript for it ships to the browser. The
+ * interactive parts are the imported children (AuthProvider, Navbar), which
+ * opt in individually.
+ *
+ * AuthProvider wraps everything because context only reaches components below
+ * the provider — putting it here is what lets any page call useAuth(). It also
+ * means the session is fetched once per page load, not once per page.
+ */
+
 import type { Metadata } from 'next';
 import { Bricolage_Grotesque, Hanken_Grotesk, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
@@ -10,6 +24,8 @@ const bricolage = Bricolage_Grotesque({ subsets: ['latin'], variable: '--font-br
 const hanken = Hanken_Grotesk({ subsets: ['latin'], variable: '--font-hanken' });
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jetbrains-mono' });
 
+// Next turns this into the <title> and <meta> tags — the page's search and
+// link-preview text. Exporting it from the layout applies it to every route.
 export const metadata: Metadata = {
     title: 'SnapLink — Fast URL Shortener with Analytics',
     description: 'Shorten URLs and track real-time analytics with Redis-cached redirects.',
