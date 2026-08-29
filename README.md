@@ -31,13 +31,14 @@ flowchart LR
 
 ## ✨ Features
 
+- **No account required** — paste and shorten straight from the landing page; signing in is an upsell, not a gate
 - **Base62 Short Codes** — nanoid-powered 7-char codes using `0-9a-zA-Z` alphabet, collision-resistant with up to 5 re-rolls
 - **Custom Aliases** — create memorable short links like `/my-link`
 - **Link Expiration** — optionally set a link to expire (1 / 7 / 30 days); expired links return `410 Gone` and are evicted from the cache
 - **Redis Caching** — cache-aside redirects for sub-millisecond response times; graceful fallback to Postgres if Redis is unavailable
 - **QR Code Generation** — every short URL gets an auto-generated QR code (PNG or data URL)
 - **Click Analytics** — track total clicks, browsers, devices, and referrers per URL
-- **Google OAuth + JWT** — sign-in is required to create links, so every URL has an owner; JWT valid for 7 days
+- **Google OAuth + JWT** — optional sign-in. Shortening works signed out; an account adds a dashboard, deletion and private per-link stats. JWT valid for 7 days
 - **Rate Limiting** — 20 URL creates/hour per IP, plus a global 200 requests/15min cap
 - **Dashboard** — manage all your links, view stats, delete URLs
 
@@ -101,7 +102,9 @@ url-shortener/
 ```bash
 # Backend
 cp .env.example Backend/.env
-# Fill in: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, JWT_SECRET
+# Fill in JWT_SECRET. GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are optional —
+# without them the API still runs and links can be created anonymously, you
+# just can't sign in.
 
 # Frontend
 echo "NEXT_PUBLIC_API_URL=http://localhost:5000" > Frontend/url-shortener-frontend/.env.local
@@ -157,6 +160,11 @@ boot if `DATABASE_URL`, `JWT_SECRET`, `BASE_URL` or `FRONTEND_URL` is missing,
 or if `JWT_SECRET` is shorter than 32 characters or still the placeholder. This
 is deliberate: the code carries a development fallback secret, and booting with
 it in production would let anyone forge a login token.
+
+Missing `GOOGLE_*` credentials are only a warning. The API boots, shortening
+works, and the sign-in routes send the user back to the frontend with
+`?error=google_auth_unavailable` rather than failing deep inside the OAuth
+exchange.
 
 ```bash
 # Generate a real secret
@@ -228,10 +236,10 @@ API, not the frontend.
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `POST` | `/url` | Required | Create short URL (body: `longUrl`, optional `customAlias`, optional `expiresAt` ISO date) |
+| `POST` | `/url` | Optional | Create short URL (body: `longUrl`, optional `customAlias`, optional `expiresAt` ISO date). Signed in, the link is owned by the caller; signed out, it is anonymous |
 | `GET` | `/:shortCode` | — | Redirect to original URL (`410` if the link has expired) |
 | `GET` | `/url/:shortCode/qr` | — | QR code — PNG by default, `?format=dataurl` for a JSON data URL |
-| `GET` | `/analytics/:shortCode` | Required | Click analytics for one URL (owner-only) |
+| `GET` | `/analytics/:shortCode` | Optional | Click analytics for one URL. Anonymous links are open to anyone with the code; owned links are owner-only (`403` otherwise) |
 | `GET` | `/analytics/dashboard` | Required | Summary stats across the caller's URLs |
 | `GET` | `/auth/google` | — | Start OAuth flow |
 | `GET` | `/auth/google/callback` | — | OAuth callback |

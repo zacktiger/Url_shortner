@@ -52,9 +52,10 @@ services:
       - key: FRONTEND_URL
         sync: false
 
-      # Google sign-in is required — creating a link needs an authenticated
-      # user, so all three must be set. GOOGLE_CALLBACK_URL must match the
-      # redirect URI registered in the Google Cloud console exactly.
+      # Google sign-in is optional — shortening works signed out, and the API
+      # boots without these (it just can't offer accounts). Set all three to
+      # enable sign-in; GOOGLE_CALLBACK_URL must match the redirect URI
+      # registered in the Google Cloud console exactly.
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET

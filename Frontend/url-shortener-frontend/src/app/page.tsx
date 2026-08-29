@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import UrlShortenerForm from '@/components/UrlShortenerForm';
 import UrlCard from '@/components/UrlCard';
 import SnapDemo from '@/components/SnapDemo';
-import { Loader2, LogIn } from 'lucide-react';
+import { LogIn } from 'lucide-react';
 
 // Three true facts about the system, shown as a numbered spec sheet instead of
 // decorative feature cards. Copy matches the backend implementation.
@@ -28,13 +28,15 @@ const SPECS = [
 ];
 
 /*
- * Landing page, and the shortest path through the app: sign in, paste a link,
- * get a short one back — without leaving this page.
+ * Landing page, and the shortest path through the app: paste a link, get a
+ * short one back — without signing in and without leaving this page.
  *
- * It renders one of three states depending on the session: still checking,
- * signed in (the form), or signed out (the gate). Holding the freshly created
- * link in local state rather than redirecting is deliberate — the user sees
- * the result, the QR toggle and the copy button immediately.
+ * The form is open to everyone. Signing in is an upsell shown underneath it,
+ * not a gate: an account adds ownership (a dashboard, deletion, stats kept
+ * private), while an anonymous link belongs to whoever holds the code. Holding
+ * the freshly created link in local state rather than redirecting is
+ * deliberate — the user sees the result, the QR toggle and the copy button
+ * immediately.
  */
 export default function Home() {
     const { user, loading } = useAuth();
@@ -62,46 +64,36 @@ export default function Home() {
                     <SnapDemo />
                 </div>
 
-                {/* Shortener form — signed-in users only, since every link needs an owner */}
+                {/* Shortener form — open to everyone, signed in or not */}
                 <div className="mt-5">
-                    {loading ? (
-                        // Session check is in flight; don't flash the sign-in gate at a signed-in user.
-                        <div className="card p-5 flex items-center gap-2.5 text-sm text-stone-500">
-                            <Loader2 className="w-4 h-4 text-accent-bright animate-spin" />
-                            <span>Checking your session…</span>
-                        </div>
-                    ) : user ? (
-                        <div className="card p-5">
-                            <UrlShortenerForm onSuccess={(record) => setCreatedUrl(record)} />
+                    <div className="card p-5">
+                        <UrlShortenerForm onSuccess={(record) => setCreatedUrl(record)} />
 
-                            {createdUrl && (
-                                <div className="mt-6 animate-slideUp">
-                                    <UrlCard url={createdUrl} />
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        // Signed-out gate: the form needs an owner for the link, so we
-                        // ask for the account up front rather than failing on submit.
-                        <div className="card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-                            <div className="min-w-0">
-                                <h2 className="text-[17px] font-semibold text-white">
-                                    Sign in with Google to start shortening links.
-                                </h2>
-                                <p className="text-[13px] leading-relaxed text-stone-400 mt-2 max-w-md">
-                                    Links are owned by your account — you get the QR code and every
-                                    click&apos;s country, device, browser and referrer.
+                        {/* Sign-in prompt, not a gate. Held back while the session
+                            check is in flight so it never flashes at a signed-in
+                            user on a hard refresh. */}
+                        {!loading && !user && (
+                            <div className="mt-4 pt-4 border-t border-hairline flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <p className="text-[13px] leading-relaxed text-stone-400 max-w-md">
+                                    Shortening works without an account. Sign in to keep your links in
+                                    a dashboard, delete them, and keep their click stats to yourself.
                                 </p>
+                                <button
+                                    onClick={handleGoogleLogin}
+                                    className="btn-secondary shrink-0 px-4 py-2.5 text-[13px] self-start sm:self-auto"
+                                >
+                                    <LogIn className="w-4 h-4" />
+                                    <span>Sign in with Google</span>
+                                </button>
                             </div>
-                            <button
-                                onClick={handleGoogleLogin}
-                                className="btn-primary shrink-0 px-5 py-3 text-sm self-start sm:self-auto"
-                            >
-                                <LogIn className="w-4 h-4" />
-                                <span>Sign in with Google</span>
-                            </button>
-                        </div>
-                    )}
+                        )}
+
+                        {createdUrl && (
+                            <div className="mt-6 animate-slideUp">
+                                <UrlCard url={createdUrl} />
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Spec sheet */}

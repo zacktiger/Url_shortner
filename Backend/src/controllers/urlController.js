@@ -102,8 +102,10 @@ export async function handleGenerateShortUrl(req, res) {
             shortCode = await generateUniqueShortCode();
         }
 
-        // requireAuth guarantees req.user, so every link is owned by its creator.
-        const userId = req.user.id;
+        // optionalAuth: req.user is set only when a valid token was sent. Signed-in
+        // creators own their links (dashboard, delete, private stats); anonymous
+        // ones are stored with userId = null and belong to whoever holds the code.
+        const userId = req.user?.id ?? null;
 
         const urlRecord = await prisma.url.create({
             data: {

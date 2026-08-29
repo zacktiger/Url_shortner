@@ -81,11 +81,15 @@ async function getClicksByDay(urlId, days = 30) {
 
 /**
  * Returns detailed analytics for a specific short URL.
- * Sign-in is required (requireAuth) and only the link's owner may read its stats.
+ *
+ * Access follows ownership: a link created while signed in is private to its
+ * owner, while a link created anonymously has no owner to check against and is
+ * readable by anyone holding the short code — possession of the code is the
+ * only credential such a link ever had.
  */
 export async function getUrlAnalytics(req, res) {
     const { shortCode } = req.params;
-    const userId = req.user.id; // requireAuth guarantees this exists
+    const userId = req.user?.id ?? null; // optionalAuth — null when signed out
 
     try {
         const urlRecord = await prisma.url.findUnique({
@@ -102,9 +106,8 @@ export async function getUrlAnalytics(req, res) {
             return res.status(404).json({ success: false, message: 'URL not found' });
         }
 
-        // Only the owner sees a link's analytics. Links created before sign-in was
-        // enforced have no owner (userId === null) and so are readable by nobody.
-        if (urlRecord.userId !== userId) {
+        // Owned links are private to their owner; unowned ones are open (see above).
+        if (urlRecord.userId !== null && urlRecord.userId !== userId) {
             return res.status(403).json({ success: false, message: 'Access denied' });
         }
 

@@ -1,14 +1,31 @@
 import express from 'express';
-import passport from '../config/passport.js';
+import passport, { isGoogleOAuthConfigured } from '../config/passport.js';
 import { handleGoogleCallback, getMe } from '../controllers/authController.js';
 import { requireAuth } from '../middleware/auth.js';
 import { FRONTEND_URL } from '../config/urls.js';
 
 const router = express.Router();
 
+/**
+ * Guards the two OAuth routes when no Google credentials are configured.
+ * Without this, passport.authenticate('google') throws "Unknown authentication
+ * strategy" — a 500 with no explanation. Sign-in is optional (links can be
+ * created anonymously), so an unconfigured instance is a valid state, not a
+ * broken one; say so and send the user back to the frontend, which already
+ * renders `?error=`.
+ */
+function requireGoogleOAuth(req, res, next) {
+    if (isGoogleOAuthConfigured) return next();
+
+    return res.redirect(
+        `${FRONTEND_URL}/auth/callback?error=${encodeURIComponent('google_auth_unavailable')}`
+    );
+}
+
 // Route to initiate Google OAuth
 router.get(
     '/google',
+    requireGoogleOAuth,
     passport.authenticate('google', {
         session: false,
         scope: ['profile', 'email'],
@@ -27,6 +44,7 @@ router.get(
 // `?error=`.
 router.get(
     '/google/callback',
+    requireGoogleOAuth,
     (req, res, next) => {
         passport.authenticate('google', { session: false }, (err, user) => {
             if (err || !user) {

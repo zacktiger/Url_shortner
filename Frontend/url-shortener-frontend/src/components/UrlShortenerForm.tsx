@@ -9,6 +9,9 @@ import { Loader2, ArrowRight, ChevronRight } from 'lucide-react';
  * landing page and the dashboard), which is why the parent decides what
  * happens after a successful create instead of this component navigating:
  * the landing page shows the new link inline, the dashboard refetches its list.
+ *
+ * It works signed in or out; the only difference is whether the resulting link
+ * gets an owner.
  */
 interface UrlShortenerFormProps {
     onSuccess: (urlRecord: any) => void;
@@ -60,8 +63,9 @@ export default function UrlShortenerForm({ onSuccess }: UrlShortenerFormProps) {
         try {
             // No user id in the body: the backend takes the owner from the JWT
             // that fetchApi attaches, so a client can't create links for
-            // someone else. Optional fields are sent as undefined, which
-            // JSON.stringify drops from the payload entirely.
+            // someone else — and when there's no token it creates the link
+            // unowned rather than rejecting it. Optional fields are sent as
+            // undefined, which JSON.stringify drops from the payload entirely.
             const result = await fetchApi('/url', {
                 method: 'POST',
                 body: JSON.stringify({

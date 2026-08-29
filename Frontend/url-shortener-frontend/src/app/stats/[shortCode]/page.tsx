@@ -132,11 +132,13 @@ interface StatsPageProps {
 /*
  * Per-link analytics: the read-heavy page of the app.
  *
- * Everything on it comes from one authenticated call to GET /analytics/:code,
- * which the backend answers with SQL aggregates (grouped counts per country,
- * device, browser, referrer) plus a zero-filled 30-day series — grouping in
- * the database rather than shipping every click row to the browser and
- * counting here.
+ * Everything on it comes from one call to GET /analytics/:code, which the
+ * backend answers with SQL aggregates (grouped counts per country, device,
+ * browser, referrer) plus a zero-filled 30-day series — grouping in the
+ * database rather than shipping every click row to the browser and counting
+ * here. Sign-in isn't required to reach the page: an anonymous link's stats are
+ * open to whoever holds the code, and an owned link's are refused (403) to
+ * everyone but its owner.
  */
 export default function UrlStatsPage({ params }: StatsPageProps) {
     // React's use() unwraps the params Promise inside a Client Component.
@@ -164,19 +166,16 @@ export default function UrlStatsPage({ params }: StatsPageProps) {
             }
         };
 
-        // Wait for the session check before deciding anything — same reason as
-        // the dashboard: `user` is null for a moment on every hard refresh.
+        // Wait for the session check so a signed-in owner's request isn't sent
+        // before AuthContext has finished validating the stored token.
         if (authLoading) return;
 
-        // Analytics are owner-only, so send signed-out visitors home to sign in
-        // rather than showing them an "Authorization token required" error.
-        if (!user) {
-            router.replace('/');
-            return;
-        }
-
+        // No sign-in gate: an anonymous link's stats are readable by anyone with
+        // the code, and fetchApi attaches the JWT from localStorage when there is
+        // one. A link owned by someone else comes back 403 and lands in the error
+        // card below, which is the honest outcome to show.
         executeFetch();
-    }, [shortCode, authLoading, user, router]);
+    }, [shortCode, authLoading]);
 
     if (authLoading || loading) {
         return (

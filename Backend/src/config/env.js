@@ -16,10 +16,11 @@ const REQUIRED_IN_PRODUCTION = [
     'FRONTEND_URL',
 ];
 
-// Google sign-in is mandatory: creating a link requires an authenticated user,
-// so without working OAuth credentials nobody can shorten anything. Booting
-// with the dummy fallbacks in passport.js would leave a live-looking but
-// unusable deployment, so these are required alongside the vars above.
+// Google sign-in is optional — shortening works signed out, and an account only
+// adds ownership (dashboard, deletion, private stats). Missing credentials are
+// therefore a warning, not a boot failure: the deployment is still useful, just
+// without accounts. GOOGLE_CALLBACK_URL is listed too because a callback left
+// pointing at localhost fails only at the very end of a real sign-in.
 const GOOGLE_CREDENTIAL_VARS = [
     'GOOGLE_CLIENT_ID',
     'GOOGLE_CLIENT_SECRET',
@@ -53,8 +54,10 @@ export function validateEnv() {
 
     const missingGoogle = GOOGLE_CREDENTIAL_VARS.filter((key) => !process.env[key]);
     if (missingGoogle.length > 0) {
-        problems.push(
-            `Google OAuth is required to sign in and create links — missing: ${missingGoogle.join(', ')}.`
+        console.warn(
+            `Google sign-in is disabled — missing: ${missingGoogle.join(', ')}. ` +
+            'Links can still be created anonymously; accounts, the dashboard and ' +
+            'per-link private stats will be unavailable.'
         );
     }
 
